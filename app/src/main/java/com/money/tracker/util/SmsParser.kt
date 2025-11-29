@@ -19,7 +19,9 @@ object SmsParser {
     private val amountPatterns = listOf(
         Regex("""Rs\.?\s*([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE),
         Regex("""INR\.?\s*([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE),
-        Regex("""₹\s*([0-9,]+\.?\d*)""")
+        Regex("""₹\s*([0-9,]+\.?\d*)"""),
+        Regex("""debited by ([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE), // SBI: "debited by 1553.0"
+        Regex("""credited by ([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE) // SBI credit format
     )
 
     private val debitKeywords = listOf(
@@ -42,6 +44,7 @@ object SmsParser {
     )
 
     private val merchantPatterns = listOf(
+        Regex("""trf to ([A-Za-z0-9\s]+?)\s+Refno""", RegexOption.IGNORE_CASE), // SBI: "trf to CHUNDURU VENKATA Refno"
         Regex("""to\s+([A-Za-z0-9\s\.]+?)\.?Ref""", RegexOption.IGNORE_CASE), // "to PAILA VENKATA S.Ref:"
         Regex("""At\s+([A-Za-z0-9\s&*_-]+?)\s+On\s+\d""", RegexOption.IGNORE_CASE), // "At MERCHANT On 2025-"
         Regex("""towards\s+([A-Za-z0-9\s&*_-]+?)\s+using""", RegexOption.IGNORE_CASE), // "towards AMAZON using"
@@ -102,11 +105,13 @@ object SmsParser {
         val lowerSender = sender.lowercase()
 
         return when {
-            upiPatterns.any { it.containsMatchIn(text) } -> TransactionSource.UPI
+            upiPatterns.any { it.containsMatchIn(text) } ||
+                lowerText.contains("trf to") || lowerText.contains("upi user") -> TransactionSource.UPI // SBI UPI format
             lowerText.contains("credit card") || lowerText.contains("cc ") ||
                 Regex("""bank\s+card\s+\d""", RegexOption.IGNORE_CASE).containsMatchIn(text) -> TransactionSource.CREDIT_CARD
             lowerText.contains("debit card") -> TransactionSource.DEBIT_CARD
             lowerText.contains("auto") && lowerText.contains("debit") -> TransactionSource.AUTO_DEBIT
+            lowerText.contains("nach") -> TransactionSource.AUTO_DEBIT // SBI NACH format
             lowerText.contains("neft") || lowerText.contains("imps") || lowerText.contains("rtgs") -> TransactionSource.BANK_TRANSFER
             lowerText.contains("atm") -> TransactionSource.DEBIT_CARD
             else -> TransactionSource.OTHER
