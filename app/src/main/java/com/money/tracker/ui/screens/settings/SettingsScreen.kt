@@ -152,9 +152,14 @@ fun SettingsScreen(
                             )
                         )
                         // Notification permission will be requested after SMS permission is granted
+                    } else if (hasSmsPermission) {
+                        // Open app info to allow user to revoke permission
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = android.net.Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(intent)
                     }
-                },
-                enabled = !hasSmsPermission // Disable toggle if already granted (can't revoke)
+                }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
