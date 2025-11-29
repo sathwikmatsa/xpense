@@ -30,22 +30,31 @@ class SmsReceiver : BroadcastReceiver() {
             // Parse the SMS
             val parsed = SmsParser.parse(body, sender) ?: continue
 
-            // Save to database
+            // Save as pending transaction and show notification
             CoroutineScope(Dispatchers.IO).launch {
                 val transaction = Transaction(
                     amount = parsed.amount,
                     type = parsed.type,
                     description = parsed.description,
                     merchant = parsed.merchant,
-                    categoryId = null, // Uncategorized - user will categorize
+                    categoryId = null,
                     source = parsed.source,
                     date = System.currentTimeMillis(),
                     rawMessage = parsed.rawMessage,
-                    isManual = false
+                    isManual = false,
+                    isPending = true // Mark as pending until user confirms
                 )
-                app.transactionRepository.insert(transaction)
+                val transactionId = app.transactionRepository.insert(transaction)
 
-                // TODO: Send notification to prompt user to categorize
+                // Show notification to prompt user
+                TransactionNotificationHelper.showTransactionNotification(
+                    context = context,
+                    transactionId = transactionId,
+                    amount = parsed.amount,
+                    type = parsed.type,
+                    merchant = parsed.merchant,
+                    source = parsed.source.name
+                )
             }
         }
     }

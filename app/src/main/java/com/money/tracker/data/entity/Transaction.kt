@@ -29,6 +29,7 @@ data class Transaction(
     val date: Long, // epoch millis
     val rawMessage: String? = null, // original SMS/email for reference
     val isManual: Boolean = false,
+    val isPending: Boolean = false, // true for SMS-detected transactions awaiting confirmation
     val createdAt: Long = System.currentTimeMillis()
 )
 

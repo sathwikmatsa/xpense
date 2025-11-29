@@ -37,13 +37,13 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE categoryId = :categoryId ORDER BY date DESC")
     fun getByCategory(categoryId: Long): Flow<List<Transaction>>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE type = :type AND date BETWEEN :startDate AND :endDate")
+    @Query("SELECT SUM(amount) FROM transactions WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0")
     fun getTotalByType(type: TransactionType, startDate: Long, endDate: Long): Flow<Double?>
 
     @Query("""
         SELECT categoryId, SUM(amount) as total
         FROM transactions
-        WHERE type = :type AND date BETWEEN :startDate AND :endDate
+        WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0
         GROUP BY categoryId
     """)
     fun getCategoryTotals(type: TransactionType, startDate: Long, endDate: Long): Flow<List<CategoryTotal>>
@@ -59,6 +59,18 @@ interface TransactionDao {
 
     @Query("SELECT COUNT(*) FROM transactions WHERE categoryId = :categoryId")
     suspend fun getTransactionCountByCategory(categoryId: Long): Int
+
+    @Query("DELETE FROM transactions WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("UPDATE transactions SET isPending = 0 WHERE id = :id")
+    suspend fun confirmPendingTransaction(id: Long)
+
+    @Query("SELECT * FROM transactions WHERE isPending = 1 ORDER BY date DESC")
+    fun getPendingTransactions(): Flow<List<Transaction>>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE isPending = 1")
+    fun getPendingCount(): Flow<Int>
 }
 
 data class CategoryTotal(

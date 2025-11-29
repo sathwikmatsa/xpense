@@ -35,11 +35,15 @@ object SmsParser {
     private val upiPatterns = listOf(
         Regex("""UPI[-/]([A-Za-z0-9]+)""", RegexOption.IGNORE_CASE),
         Regex("""UPI\s+Ref""", RegexOption.IGNORE_CASE),
+        Regex("""via\s+UPI""", RegexOption.IGNORE_CASE),
+        Regex("""UPI\s+on""", RegexOption.IGNORE_CASE),
         Regex("""@[a-z]+""", RegexOption.IGNORE_CASE) // UPI ID pattern
     )
 
     private val merchantPatterns = listOf(
-        Regex("""(?:to|at|@)\s+([A-Za-z0-9\s]+?)(?:\s+on|\s+ref|\.|\s*$)""", RegexOption.IGNORE_CASE),
+        Regex("""to\s+([A-Za-z0-9\s\.]+?)\.?Ref""", RegexOption.IGNORE_CASE), // "to PAILA VENKATA S.Ref:"
+        Regex("""At\s+([A-Za-z0-9\s&*_-]+?)\s+On\s+\d""", RegexOption.IGNORE_CASE), // "At MERCHANT On 2025-"
+        Regex("""(?:to|at)\s+([A-Za-z0-9\s]+?)(?:\s+on|\s+ref|\.|\s*$)""", RegexOption.IGNORE_CASE),
         Regex("""VPA\s+([a-z0-9@.]+)""", RegexOption.IGNORE_CASE)
     )
 
@@ -96,7 +100,8 @@ object SmsParser {
 
         return when {
             upiPatterns.any { it.containsMatchIn(text) } -> TransactionSource.UPI
-            lowerText.contains("credit card") || lowerSender.contains("credit") -> TransactionSource.CREDIT_CARD
+            lowerText.contains("credit card") || lowerText.contains("cc ") ||
+                Regex("""bank\s+card\s+\d""", RegexOption.IGNORE_CASE).containsMatchIn(text) -> TransactionSource.CREDIT_CARD
             lowerText.contains("debit card") -> TransactionSource.DEBIT_CARD
             lowerText.contains("auto") && lowerText.contains("debit") -> TransactionSource.AUTO_DEBIT
             lowerText.contains("neft") || lowerText.contains("imps") || lowerText.contains("rtgs") -> TransactionSource.BANK_TRANSFER
@@ -116,13 +121,10 @@ object SmsParser {
     }
 
     private fun createDescription(type: TransactionType, merchant: String?, source: TransactionSource): String {
-        val action = if (type == TransactionType.EXPENSE) "Payment" else "Received"
-        val sourceStr = source.name.replace("_", " ").lowercase()
-            .replaceFirstChar { it.uppercase() }
-
         return when {
-            merchant != null -> "$action to $merchant via $sourceStr"
-            else -> "$action via $sourceStr"
+            merchant != null -> merchant
+            type == TransactionType.EXPENSE -> "Payment"
+            else -> "Received"
         }
     }
 }

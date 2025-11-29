@@ -64,6 +64,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.TransactionCard
 import com.money.tracker.ui.theme.ExpenseRed
@@ -177,6 +178,27 @@ fun HomeScreen(
                             daysPassed = daysPassed,
                             daysInMonth = daysInMonth,
                             currencyFormat = currencyFormat
+                        )
+                    }
+                }
+
+                // Pending Transactions Section
+                if (uiState.pendingTransactions.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Pending Transactions",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    items(uiState.pendingTransactions) { transaction ->
+                        PendingTransactionCard(
+                            transaction = transaction,
+                            currencyFormat = currencyFormat,
+                            onDismiss = { viewModel.dismissPendingTransaction(transaction.id) },
+                            onEdit = { onTransactionClick(transaction.id) }
                         )
                     }
                 }
@@ -653,6 +675,75 @@ private fun EmptyState() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+private fun PendingTransactionCard(
+    transaction: Transaction,
+    currencyFormat: NumberFormat,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit
+) {
+    val isExpense = transaction.type == TransactionType.EXPENSE
+    val amountColor = if (isExpense) ExpenseRed else IncomeGreen
+    val dateFormat = SimpleDateFormat("MMM dd, h:mm a", Locale.getDefault())
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        ),
+        onClick = onEdit
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = transaction.merchant ?: transaction.description ?: "Unknown",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "${transaction.source.name} • ${dateFormat.format(transaction.date)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = "${if (isExpense) "-" else "+"}${currencyFormat.format(transaction.amount)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = amountColor
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Dismiss", color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(
+                    onClick = onEdit,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Add", color = IncomeGreen)
+                }
+            }
         }
     }
 }

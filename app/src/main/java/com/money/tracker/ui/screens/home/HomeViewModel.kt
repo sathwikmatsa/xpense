@@ -20,6 +20,7 @@ import java.util.Locale
 
 data class HomeUiState(
     val transactions: List<Transaction> = emptyList(),
+    val pendingTransactions: List<Transaction> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
@@ -62,7 +63,8 @@ class HomeViewModel(
         transactionRepository.getTotalIncome(startOfMonth, endOfMonth),
         transactionRepository.getTotalExpense(startOfMonth, endOfMonth),
         budgetRepository.getBudget(currentYearMonth),
-        _showIncome
+        _showIncome,
+        transactionRepository.getPendingTransactions()
     ) { values ->
         val transactions = values[0] as List<Transaction>
         val categories = values[1] as List<Category>
@@ -70,9 +72,11 @@ class HomeViewModel(
         val expense = values[3] as Double?
         val budget = values[4] as com.money.tracker.data.entity.Budget?
         val showIncome = values[5] as Boolean
+        val pendingTransactions = values[6] as List<Transaction>
 
         HomeUiState(
-            transactions = transactions,
+            transactions = transactions.filter { !it.isPending },
+            pendingTransactions = pendingTransactions,
             categories = categories.associateBy { it.id },
             totalIncome = income ?: 0.0,
             totalExpense = expense ?: 0.0,
@@ -99,6 +103,12 @@ class HomeViewModel(
     fun clearBudget() {
         viewModelScope.launch {
             budgetRepository.deleteBudget(currentYearMonth)
+        }
+    }
+
+    fun dismissPendingTransaction(transactionId: Long) {
+        viewModelScope.launch {
+            transactionRepository.deleteById(transactionId)
         }
     }
 

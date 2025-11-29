@@ -61,4 +61,20 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     suspend fun getTransactionCountByCategory(categoryId: Long): Int {
         return transactionDao.getTransactionCountByCategory(categoryId)
     }
+
+    suspend fun deleteById(id: Long) {
+        transactionDao.deleteById(id)
+    }
+
+    suspend fun confirmPendingTransaction(id: Long) {
+        transactionDao.confirmPendingTransaction(id)
+    }
+
+    fun getPendingTransactions(): Flow<List<Transaction>> {
+        return transactionDao.getPendingTransactions()
+    }
+
+    fun getPendingCount(): Flow<Int> {
+        return transactionDao.getPendingCount()
+    }
 }

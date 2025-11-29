@@ -65,7 +65,8 @@ class EditTransactionViewModel(
                 type = type,
                 categoryId = categoryId,
                 source = source,
-                date = date
+                date = date,
+                isPending = false // Mark as confirmed when saved
             )
             transactionRepository.update(updated)
             _uiState.value = _uiState.value.copy(isSaved = true)

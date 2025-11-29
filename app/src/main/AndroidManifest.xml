@@ -39,6 +39,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Notification Action Receiver for transaction dismiss -->
+        <receiver
+            android:name=".service.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.money.tracker.DISMISS_TRANSACTION" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

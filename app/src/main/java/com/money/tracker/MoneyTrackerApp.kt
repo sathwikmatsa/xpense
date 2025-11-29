@@ -5,6 +5,7 @@ import com.money.tracker.data.AppDatabase
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TransactionRepository
+import com.money.tracker.service.TransactionNotificationHelper
 
 class MoneyTrackerApp : Application() {
 
@@ -12,4 +13,9 @@ class MoneyTrackerApp : Application() {
     val transactionRepository by lazy { TransactionRepository(database.transactionDao()) }
     val categoryRepository by lazy { CategoryRepository(database.categoryDao()) }
     val budgetRepository by lazy { BudgetRepository(database.budgetDao()) }
+
+    override fun onCreate() {
+        super.onCreate()
+        TransactionNotificationHelper.createNotificationChannel(this)
+    }
 }
