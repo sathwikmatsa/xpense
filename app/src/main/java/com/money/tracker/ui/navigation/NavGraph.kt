@@ -86,11 +86,19 @@ val bottomNavItems = listOf(
 fun MoneyTrackerNavGraph(
     transactionRepository: TransactionRepository,
     categoryRepository: CategoryRepository,
-    budgetRepository: BudgetRepository
+    budgetRepository: BudgetRepository,
+    openAddTransaction: Boolean = false
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+
+    // Navigate to add transaction if requested via intent
+    androidx.compose.runtime.LaunchedEffect(openAddTransaction) {
+        if (openAddTransaction) {
+            navController.navigate(Screen.AddTransaction.route)
+        }
+    }
 
     val showBottomBar = currentDestination?.route in listOf(
         Screen.Home.route,

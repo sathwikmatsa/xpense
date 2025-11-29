@@ -13,13 +13,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val app = application as MoneyTrackerApp
+        val openAddTransaction = intent?.getBooleanExtra("open_add_transaction", false) ?: false
 
         setContent {
             MoneyTrackerTheme {
                 MoneyTrackerNavGraph(
                     transactionRepository = app.transactionRepository,
                     categoryRepository = app.categoryRepository,
-                    budgetRepository = app.budgetRepository
+                    budgetRepository = app.budgetRepository,
+                    openAddTransaction = openAddTransaction
                 )
             }
         }

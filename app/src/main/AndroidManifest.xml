@@ -48,6 +48,28 @@
             </intent-filter>
         </receiver>
 
+        <!-- UPI Notification Dismiss Receiver -->
+        <receiver
+            android:name=".service.UpiNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.money.tracker.DISMISS_UPI_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Accessibility Service for UPI app monitoring -->
+        <service
+            android:name=".service.UpiMonitorService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
     </application>
 
 </manifest>
