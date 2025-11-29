@@ -24,7 +24,8 @@ object SmsParser {
 
     private val debitKeywords = listOf(
         "debited", "debit", "spent", "paid", "payment", "purchase",
-        "withdrawn", "withdrawal", "sent", "transfer to", "txn"
+        "withdrawn", "withdrawal", "sent", "transfer to", "txn",
+        "one-time password for inr", "otp for inr", "otp for txn" // OTP-based transaction detection
     )
 
     private val creditKeywords = listOf(
@@ -43,6 +44,8 @@ object SmsParser {
     private val merchantPatterns = listOf(
         Regex("""to\s+([A-Za-z0-9\s\.]+?)\.?Ref""", RegexOption.IGNORE_CASE), // "to PAILA VENKATA S.Ref:"
         Regex("""At\s+([A-Za-z0-9\s&*_-]+?)\s+On\s+\d""", RegexOption.IGNORE_CASE), // "At MERCHANT On 2025-"
+        Regex("""towards\s+([A-Za-z0-9\s&*_-]+?)\s+using""", RegexOption.IGNORE_CASE), // "towards AMAZON using"
+        Regex("""at\s+([A-Za-z0-9\s&*_-]+?)\s+on\s+[A-Z]""", RegexOption.IGNORE_CASE), // "at AMAZON on ICICI"
         Regex("""(?:to|at)\s+([A-Za-z0-9\s]+?)(?:\s+on|\s+ref|\.|\s*$)""", RegexOption.IGNORE_CASE),
         Regex("""VPA\s+([a-z0-9@.]+)""", RegexOption.IGNORE_CASE)
     )
