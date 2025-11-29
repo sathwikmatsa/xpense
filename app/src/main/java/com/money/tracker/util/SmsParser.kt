@@ -21,7 +21,10 @@ object SmsParser {
         Regex("""INR\.?\s*([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE),
         Regex("""₹\s*([0-9,]+\.?\d*)"""),
         Regex("""debited by ([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE), // SBI: "debited by 1553.0"
-        Regex("""credited by ([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE) // SBI credit format
+        Regex("""credited by ([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE), // SBI credit format
+        Regex("""USD\s*([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE), // Foreign currency
+        Regex("""EUR\s*([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE),
+        Regex("""GBP\s*([0-9,]+\.?\d*)""", RegexOption.IGNORE_CASE)
     )
 
     private val debitKeywords = listOf(
