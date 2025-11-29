@@ -1,0 +1,50 @@
+package com.money.tracker.ui.screens.transactions
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Transaction
+import com.money.tracker.data.repository.CategoryRepository
+import com.money.tracker.data.repository.TransactionRepository
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+
+data class TransactionsUiState(
+    val transactions: List<Transaction> = emptyList(),
+    val categories: Map<Long, Category> = emptyMap(),
+    val isLoading: Boolean = true
+)
+
+class TransactionsViewModel(
+    transactionRepository: TransactionRepository,
+    categoryRepository: CategoryRepository
+) : ViewModel() {
+
+    val uiState: StateFlow<TransactionsUiState> = combine(
+        transactionRepository.allTransactions,
+        categoryRepository.allCategories
+    ) { transactions, categories ->
+        TransactionsUiState(
+            transactions = transactions,
+            categories = categories.associateBy { it.id },
+            isLoading = false
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = TransactionsUiState()
+    )
+
+    class Factory(
+        private val transactionRepository: TransactionRepository,
+        private val categoryRepository: CategoryRepository
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return TransactionsViewModel(transactionRepository, categoryRepository) as T
+        }
+    }
+}

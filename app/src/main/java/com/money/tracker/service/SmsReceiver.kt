@@ -1,0 +1,52 @@
+package com.money.tracker.service
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.provider.Telephony
+import com.money.tracker.MoneyTrackerApp
+import com.money.tracker.data.entity.Transaction
+import com.money.tracker.util.SmsParser
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+class SmsReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            return
+        }
+
+        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+        if (messages.isEmpty()) return
+
+        val app = context.applicationContext as? MoneyTrackerApp ?: return
+
+        for (sms in messages) {
+            val sender = sms.displayOriginatingAddress ?: continue
+            val body = sms.messageBody ?: continue
+
+            // Parse the SMS
+            val parsed = SmsParser.parse(body, sender) ?: continue
+
+            // Save to database
+            CoroutineScope(Dispatchers.IO).launch {
+                val transaction = Transaction(
+                    amount = parsed.amount,
+                    type = parsed.type,
+                    description = parsed.description,
+                    merchant = parsed.merchant,
+                    categoryId = null, // Uncategorized - user will categorize
+                    source = parsed.source,
+                    date = System.currentTimeMillis(),
+                    rawMessage = parsed.rawMessage,
+                    isManual = false
+                )
+                app.transactionRepository.insert(transaction)
+
+                // TODO: Send notification to prompt user to categorize
+            }
+        }
+    }
+}

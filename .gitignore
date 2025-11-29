@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/
+
+# IDE
+.idea/
+*.iml
+
+# Local properties
+local.properties
+
+# macOS
+.DS_Store
+
+# Build outputs
+*.apk
+*.aab
+app/release/
+
+# Misc
+*.log
+*.tmp
