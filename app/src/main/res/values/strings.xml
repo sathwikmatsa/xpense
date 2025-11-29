@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Money Tracker</string>
+    <string name="app_name">Xpense</string>
     <string name="accessibility_service_description">Monitors when you use UPI payment apps (GPay, PhonePe, CRED, etc.) and reminds you to add transactions after payments.</string>
 </resources>

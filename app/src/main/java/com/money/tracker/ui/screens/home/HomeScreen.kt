@@ -118,7 +118,7 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Money Tracker",
+                        text = "Xpense",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleLarge
                     )
