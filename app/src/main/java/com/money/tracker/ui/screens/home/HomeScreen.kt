@@ -247,6 +247,7 @@ fun HomeScreen(
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 private fun BudgetCard(
     budget: Double?,
     totalExpense: Double,
@@ -709,7 +710,7 @@ private fun PendingTransactionCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = transaction.merchant ?: transaction.description ?: "Unknown",
+                        text = transaction.merchant ?: transaction.description,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )

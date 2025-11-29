@@ -66,12 +66,15 @@ class HomeViewModel(
         _showIncome,
         transactionRepository.getPendingTransactions()
     ) { values ->
+        @Suppress("UNCHECKED_CAST")
         val transactions = values[0] as List<Transaction>
+        @Suppress("UNCHECKED_CAST")
         val categories = values[1] as List<Category>
         val income = values[2] as Double?
         val expense = values[3] as Double?
         val budget = values[4] as com.money.tracker.data.entity.Budget?
         val showIncome = values[5] as Boolean
+        @Suppress("UNCHECKED_CAST")
         val pendingTransactions = values[6] as List<Transaction>
 
         HomeUiState(

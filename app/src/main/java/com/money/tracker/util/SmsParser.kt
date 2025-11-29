@@ -103,9 +103,8 @@ object SmsParser {
         return null
     }
 
-    private fun determineSource(text: String, sender: String): TransactionSource {
+    private fun determineSource(text: String, @Suppress("UNUSED_PARAMETER") sender: String): TransactionSource {
         val lowerText = text.lowercase()
-        val lowerSender = sender.lowercase()
 
         return when {
             upiPatterns.any { it.containsMatchIn(text) } ||
@@ -131,7 +130,7 @@ object SmsParser {
         return null
     }
 
-    private fun createDescription(type: TransactionType, merchant: String?, source: TransactionSource): String {
+    private fun createDescription(type: TransactionType, merchant: String?, @Suppress("UNUSED_PARAMETER") source: TransactionSource): String {
         return when {
             merchant != null -> merchant
             type == TransactionType.EXPENSE -> "Payment"

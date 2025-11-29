@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -111,7 +111,7 @@ fun CategoriesScreen(
                 title = { Text("Categories", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -247,7 +247,7 @@ private fun CategoryItem(
 private fun CategoryEditDialog(
     category: Category?,
     parentCategories: List<Category>,
-    allCategories: List<Category>,
+    @Suppress("UNUSED_PARAMETER") allCategories: List<Category>,
     onSave: (name: String, emoji: String, parentId: Long?) -> Unit,
     onDismiss: () -> Unit
 ) {

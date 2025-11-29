@@ -8,6 +8,7 @@ import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TransactionRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -68,6 +69,7 @@ data class TrendUiState(
     val categories: List<Category> = emptyList()
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AnalyticsViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository

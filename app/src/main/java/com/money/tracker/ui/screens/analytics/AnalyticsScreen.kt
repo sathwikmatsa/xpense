@@ -586,7 +586,7 @@ private fun CategorySelectionDialog(
 private fun BarChart(
     data: List<DailySpending>,
     maxAmount: Double,
-    currencyFormat: NumberFormat
+    @Suppress("UNUSED_PARAMETER") currencyFormat: NumberFormat
 ) {
     val barColor = MaterialTheme.colorScheme.primary
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -787,7 +787,7 @@ private fun CategoryBreakdownCard(
         }
 
         LinearProgressIndicator(
-            progress = item.percentage / 100f,
+            progress = { item.percentage / 100f },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp)
@@ -840,7 +840,7 @@ private fun CategoryBreakdownCard(
                             }
                         }
                         LinearProgressIndicator(
-                            progress = (child.amount / item.amount).toFloat(),
+                            progress = { (child.amount / item.amount).toFloat() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 2.dp)

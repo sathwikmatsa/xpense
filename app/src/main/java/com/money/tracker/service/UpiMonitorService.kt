@@ -7,14 +7,12 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.app.NotificationCompat
 import com.money.tracker.MainActivity
 import com.money.tracker.R
 
 class UpiMonitorService : AccessibilityService() {
-    private val TAG = "UpiMonitorService"
 
     companion object {
         private const val CHANNEL_ID = "upi_monitor"
@@ -50,7 +48,6 @@ class UpiMonitorService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.d(TAG, "Service connected")
         createNotificationChannel()
 
         val info = AccessibilityServiceInfo().apply {
@@ -71,24 +68,12 @@ class UpiMonitorService : AccessibilityService() {
         if (event == null) return
 
         val packageName = event.packageName?.toString() ?: return
-
-        // Only log UPI app events to reduce noise
-        if (packageName in UPI_PACKAGES) {
-            Log.v(TAG, "Event from: $packageName type: ${event.eventType}")
-        }
-
         if (packageName !in UPI_PACKAGES) return
 
-        val eventType = when (event.eventType) {
-            AccessibilityEvent.TYPE_ANNOUNCEMENT -> "ANNOUNCEMENT"
-            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED -> "NOTIFICATION"
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> "CONTENT_CHANGED"
-            else -> "OTHER(${event.eventType})"
-        }
-
         // Get text content from the event and source node
+        @Suppress("DEPRECATION")
         val textContent = buildString {
-            event.text?.forEach { append(it).append(" ") }
+            event.text.forEach { append(it).append(" ") }
             event.contentDescription?.let { append(it).append(" ") }
 
             // Also try to get text from source node
@@ -107,14 +92,10 @@ class UpiMonitorService : AccessibilityService() {
                     }
                     node.recycle()
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error reading source node: ${e.message}")
+            } catch (_: Exception) {
+                // Ignore errors reading source node
             }
         }.lowercase()
-
-        if (textContent.isNotBlank()) {
-            Log.d(TAG, "[$eventType] text: ${textContent.take(150)}")
-        }
 
         if (textContent.isBlank()) return
 
@@ -125,16 +106,13 @@ class UpiMonitorService : AccessibilityService() {
         val isPinEntry = PIN_PATTERN.containsMatchIn(textContent)
 
         if (isPinEntry && !pinEntryDetected) {
-            Log.d(TAG, "PIN entry detected: ${textContent.take(20)}")
             pinEntryDetected = true
-
             // Schedule notification after delay (to give time for payment to complete)
             handler.removeCallbacksAndMessages(null)
             handler.postDelayed({
                 val now = System.currentTimeMillis()
                 if (now - lastNotificationTime > DEBOUNCE_MS) {
                     lastNotificationTime = now
-                    Log.d(TAG, "Showing notification after PIN entry")
                     showTransactionPrompt()
                 }
                 pinEntryDetected = false
@@ -142,7 +120,6 @@ class UpiMonitorService : AccessibilityService() {
         }
 
         if (looksLikePayment) {
-            Log.d(TAG, "Payment success keyword detected: ${textContent.take(50)}")
             // Cancel PIN-based delayed notification and show immediately
             handler.removeCallbacksAndMessages(null)
             pinEntryDetected = false
@@ -150,10 +127,7 @@ class UpiMonitorService : AccessibilityService() {
             val now = System.currentTimeMillis()
             if (now - lastNotificationTime > DEBOUNCE_MS) {
                 lastNotificationTime = now
-                Log.d(TAG, "Showing notification prompt")
                 showTransactionPrompt()
-            } else {
-                Log.d(TAG, "Debounced - too soon since last notification")
             }
         }
     }
