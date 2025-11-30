@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,18 +19,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -58,7 +67,8 @@ enum class TimeRangeFilter(val label: String, val days: Int?) {
     TODAY("Today", 0),
     WEEK("Last 7 Days", 7),
     MONTH("Last 30 Days", 30),
-    THREE_MONTHS("Last 3 Months", 90)
+    THREE_MONTHS("Last 3 Months", 90),
+    CUSTOM("Custom", null)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,25 +83,51 @@ fun TransactionsScreen(
     var timeRangeFilter by remember { mutableStateOf(TimeRangeFilter.ALL) }
     var selectedCategories by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showFilterSheet by remember { mutableStateOf(false) }
+    var customStartDate by remember { mutableStateOf<Long?>(null) }
+    var customEndDate by remember { mutableStateOf<Long?>(null) }
 
     val sheetState = rememberModalBottomSheetState()
+    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
 
     // Calculate time range
-    val startTime = remember(timeRangeFilter) {
-        val days = timeRangeFilter.days
-        if (days == null) {
-            0L
-        } else {
-            Calendar.getInstance().apply {
-                if (days == 0) {
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                } else {
-                    add(Calendar.DAY_OF_YEAR, -days)
-                }
-            }.timeInMillis
+    val (startTime, endTime) = remember(timeRangeFilter, customStartDate, customEndDate) {
+        when (timeRangeFilter) {
+            TimeRangeFilter.ALL -> Pair(0L, Long.MAX_VALUE)
+            TimeRangeFilter.CUSTOM -> {
+                val start = customStartDate?.let {
+                    Calendar.getInstance().apply {
+                        timeInMillis = it
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+                } ?: 0L
+                val end = customEndDate?.let {
+                    Calendar.getInstance().apply {
+                        timeInMillis = it
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                        set(Calendar.MILLISECOND, 999)
+                    }.timeInMillis
+                } ?: Long.MAX_VALUE
+                Pair(start, end)
+            }
+            else -> {
+                val days = timeRangeFilter.days!!
+                val start = Calendar.getInstance().apply {
+                    if (days == 0) {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    } else {
+                        add(Calendar.DAY_OF_YEAR, -days)
+                    }
+                }.timeInMillis
+                Pair(start, Long.MAX_VALUE)
+            }
         }
     }
 
@@ -118,7 +154,7 @@ fun TransactionsScreen(
             TransactionTypeFilter.INCOME -> txn.type == TransactionType.INCOME
             TransactionTypeFilter.EXPENSE -> txn.type == TransactionType.EXPENSE
         }
-        val matchesTime = txn.date >= startTime
+        val matchesTime = txn.date >= startTime && txn.date <= endTime
         val matchesCategory = expandedCategories.isEmpty() || txn.categoryId in expandedCategories
 
         matchesType && matchesTime && matchesCategory
@@ -136,6 +172,13 @@ fun TransactionsScreen(
         if (selectedCategories.isNotEmpty()) "categories" else null
     ).size
 
+    // Custom date range label for display
+    val customDateLabel = if (timeRangeFilter == TimeRangeFilter.CUSTOM) {
+        val start = customStartDate?.let { dateFormat.format(Date(it)) } ?: "Start"
+        val end = customEndDate?.let { dateFormat.format(Date(it)) } ?: "End"
+        "$start - $end"
+    } else null
+
     if (showFilterSheet) {
         ModalBottomSheet(
             onDismissRequest = { showFilterSheet = false },
@@ -147,6 +190,10 @@ fun TransactionsScreen(
                 onTypeFilterChange = { typeFilter = it },
                 timeRangeFilter = timeRangeFilter,
                 onTimeRangeChange = { timeRangeFilter = it },
+                customStartDate = customStartDate,
+                customEndDate = customEndDate,
+                onCustomStartDateChange = { customStartDate = it },
+                onCustomEndDateChange = { customEndDate = it },
                 selectedCategories = selectedCategories,
                 onCategoryToggle = { categoryId ->
                     selectedCategories = if (categoryId in selectedCategories) {
@@ -159,6 +206,8 @@ fun TransactionsScreen(
                     typeFilter = TransactionTypeFilter.ALL
                     timeRangeFilter = TimeRangeFilter.ALL
                     selectedCategories = emptySet()
+                    customStartDate = null
+                    customEndDate = null
                 }
             )
         }
@@ -242,8 +291,12 @@ fun TransactionsScreen(
                         if (timeRangeFilter != TimeRangeFilter.ALL) {
                             item {
                                 AssistChip(
-                                    onClick = { timeRangeFilter = TimeRangeFilter.ALL },
-                                    label = { Text(timeRangeFilter.label) },
+                                    onClick = {
+                                        timeRangeFilter = TimeRangeFilter.ALL
+                                        customStartDate = null
+                                        customEndDate = null
+                                    },
+                                    label = { Text(customDateLabel ?: timeRangeFilter.label) },
                                     trailingIcon = {
                                         Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.padding(start = 4.dp))
                                     }
@@ -313,6 +366,7 @@ fun TransactionsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterBottomSheet(
     categories: List<Category>,
@@ -320,10 +374,91 @@ private fun FilterBottomSheet(
     onTypeFilterChange: (TransactionTypeFilter) -> Unit,
     timeRangeFilter: TimeRangeFilter,
     onTimeRangeChange: (TimeRangeFilter) -> Unit,
+    customStartDate: Long?,
+    customEndDate: Long?,
+    onCustomStartDateChange: (Long?) -> Unit,
+    onCustomEndDateChange: (Long?) -> Unit,
     selectedCategories: Set<Long>,
     onCategoryToggle: (Long) -> Unit,
     onClearFilters: () -> Unit
 ) {
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
+
+    val today = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+    }
+
+    if (showStartDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = customStartDate ?: System.currentTimeMillis(),
+            selectableDates = object : androidx.compose.material3.SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    // Can't select future dates or dates after end date
+                    val notFuture = utcTimeMillis <= today
+                    val beforeEnd = customEndDate?.let { utcTimeMillis <= it } ?: true
+                    return notFuture && beforeEnd
+                }
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showStartDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { onCustomStartDateChange(it) }
+                    showStartDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showEndDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = customEndDate ?: System.currentTimeMillis(),
+            selectableDates = object : androidx.compose.material3.SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    // Can't select future dates or dates before start date
+                    val notFuture = utcTimeMillis <= today
+                    val afterStart = customStartDate?.let { utcTimeMillis >= it } ?: true
+                    return notFuture && afterStart
+                }
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { onCustomEndDateChange(it) }
+                    showEndDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -382,6 +517,37 @@ private fun FilterBottomSheet(
                     onClick = { onTimeRangeChange(filter) },
                     label = { Text(filter.label) }
                 )
+            }
+        }
+
+        // Custom Date Range (shown when CUSTOM is selected)
+        if (timeRangeFilter == TimeRangeFilter.CUSTOM) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showStartDatePicker = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        Icons.Default.DateRange,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    Text(customStartDate?.let { dateFormat.format(Date(it)) } ?: "Start Date")
+                }
+                OutlinedButton(
+                    onClick = { showEndDatePicker = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        Icons.Default.DateRange,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    Text(customEndDate?.let { dateFormat.format(Date(it)) } ?: "End Date")
+                }
             }
         }
 
