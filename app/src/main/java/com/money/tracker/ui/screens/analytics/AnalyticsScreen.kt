@@ -153,7 +153,7 @@ private fun SpendingOverviewWidget(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -306,7 +306,7 @@ private fun SpendingTrendWidget(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -1046,7 +1046,7 @@ private fun SplitSummaryWidget(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
