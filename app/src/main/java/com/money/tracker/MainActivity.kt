@@ -1,6 +1,8 @@
 package com.money.tracker
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,9 +23,25 @@ class MainActivity : ComponentActivity() {
                     transactionRepository = app.transactionRepository,
                     categoryRepository = app.categoryRepository,
                     budgetRepository = app.budgetRepository,
-                    openAddTransaction = openAddTransaction
+                    upiReminderRepository = app.upiReminderRepository,
+                    openAddTransaction = openAddTransaction,
+                    onOpenUpiApp = { packageName -> openUpiApp(packageName) }
                 )
             }
+        }
+    }
+
+    private fun openUpiApp(packageName: String) {
+        try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(launchIntent)
+            } else {
+                Toast.makeText(this, "App not installed", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open app", Toast.LENGTH_SHORT).show()
         }
     }
 }

@@ -43,6 +43,7 @@ import androidx.navigation.navArgument
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TransactionRepository
+import com.money.tracker.data.repository.UpiReminderRepository
 import com.money.tracker.ui.screens.analytics.AnalyticsScreen
 import com.money.tracker.ui.screens.analytics.AnalyticsViewModel
 import com.money.tracker.ui.screens.home.HomeScreen
@@ -87,7 +88,9 @@ fun MoneyTrackerNavGraph(
     transactionRepository: TransactionRepository,
     categoryRepository: CategoryRepository,
     budgetRepository: BudgetRepository,
-    openAddTransaction: Boolean = false
+    upiReminderRepository: UpiReminderRepository,
+    openAddTransaction: Boolean = false,
+    onOpenUpiApp: (String) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -117,14 +120,15 @@ fun MoneyTrackerNavGraph(
             ) {
             composable(Screen.Home.route) {
                 val viewModel: HomeViewModel = viewModel(
-                    factory = HomeViewModel.Factory(transactionRepository, categoryRepository, budgetRepository)
+                    factory = HomeViewModel.Factory(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository)
                 )
                 HomeScreen(
                     viewModel = viewModel,
                     onTransactionClick = { id ->
                         navController.navigate(Screen.EditTransaction.createRoute(id))
                     },
-                    onSettingsClick = { navController.navigate(Screen.Settings.route) }
+                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                    onOpenUpiApp = onOpenUpiApp
                 )
             }
 

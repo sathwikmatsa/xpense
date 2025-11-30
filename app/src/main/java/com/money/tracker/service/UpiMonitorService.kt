@@ -44,6 +44,7 @@ class UpiMonitorService : AccessibilityService() {
 
     private var lastNotificationTime = 0L
     private var pinEntryDetected = false
+    private var lastUpiPackage: String? = null
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun onServiceConnected() {
@@ -107,13 +108,14 @@ class UpiMonitorService : AccessibilityService() {
 
         if (isPinEntry && !pinEntryDetected) {
             pinEntryDetected = true
+            lastUpiPackage = packageName
             // Schedule notification after delay (to give time for payment to complete)
             handler.removeCallbacksAndMessages(null)
             handler.postDelayed({
                 val now = System.currentTimeMillis()
                 if (now - lastNotificationTime > DEBOUNCE_MS) {
                     lastNotificationTime = now
-                    showTransactionPrompt()
+                    showTransactionPrompt(lastUpiPackage)
                 }
                 pinEntryDetected = false
             }, PIN_NOTIFICATION_DELAY_MS)
@@ -127,7 +129,7 @@ class UpiMonitorService : AccessibilityService() {
             val now = System.currentTimeMillis()
             if (now - lastNotificationTime > DEBOUNCE_MS) {
                 lastNotificationTime = now
-                showTransactionPrompt()
+                showTransactionPrompt(packageName)
             }
         }
     }
@@ -152,7 +154,21 @@ class UpiMonitorService : AccessibilityService() {
         }
     }
 
-    private fun showTransactionPrompt() {
+    private fun getAppName(packageName: String): String {
+        return when (packageName) {
+            "com.google.android.apps.nbu.paisa.user" -> "GPay"
+            "com.phonepe.app" -> "PhonePe"
+            "net.one97.paytm" -> "Paytm"
+            "in.org.npci.upiapp" -> "BHIM"
+            "com.dreamplug.androidapp" -> "CRED"
+            "in.amazon.mShop.android.shopping" -> "Amazon Pay"
+            else -> "UPI App"
+        }
+    }
+
+    private fun showTransactionPrompt(packageName: String?) {
+        val appName = packageName?.let { getAppName(it) } ?: "UPI App"
+
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("open_add_transaction", true)
@@ -175,13 +191,27 @@ class UpiMonitorService : AccessibilityService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Intent for when notification is swiped away (save reminder)
+        val swipeIntent = Intent(this, UpiNotificationReceiver::class.java).apply {
+            action = UpiNotificationReceiver.ACTION_SWIPED
+            putExtra(UpiNotificationReceiver.EXTRA_PACKAGE_NAME, packageName ?: "unknown")
+            putExtra(UpiNotificationReceiver.EXTRA_APP_NAME, appName)
+        }
+        val swipePendingIntent = PendingIntent.getBroadcast(
+            this,
+            1, // Different request code to avoid overwriting
+            swipeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Made a payment?")
-            .setContentText("Tap to add your UPI transaction")
+            .setContentText("Tap to add your $appName transaction")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setDeleteIntent(swipePendingIntent)
             .addAction(0, "Dismiss", dismissPendingIntent)
             .addAction(0, "Add", pendingIntent)
             .build()

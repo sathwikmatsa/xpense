@@ -8,17 +8,19 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.money.tracker.data.dao.BudgetDao
 import com.money.tracker.data.dao.CategoryDao
 import com.money.tracker.data.dao.TransactionDao
+import com.money.tracker.data.dao.UpiReminderDao
 import com.money.tracker.data.entity.Budget
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.DefaultCategories
 import com.money.tracker.data.entity.Transaction
+import com.money.tracker.data.entity.UpiReminder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Database(
-    entities = [Transaction::class, Category::class, Budget::class],
-    version = 5,
+    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class],
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,6 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun categoryDao(): CategoryDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun upiReminderDao(): UpiReminderDao
 
     companion object {
         @Volatile

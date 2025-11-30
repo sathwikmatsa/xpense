@@ -9,6 +9,16 @@
     <!-- Notification permission for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Query UPI apps to launch them -->
+    <queries>
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
+        <package android:name="com.phonepe.app" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
+        <package android:name="com.dreamplug.androidapp" />
+        <package android:name="in.amazon.mShop.android.shopping" />
+    </queries>
+
     <application
         android:name=".MoneyTrackerApp"
         android:allowBackup="true"
@@ -54,6 +64,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.money.tracker.DISMISS_UPI_NOTIFICATION" />
+                <action android:name="com.money.tracker.SWIPED_UPI_NOTIFICATION" />
             </intent-filter>
         </receiver>
 

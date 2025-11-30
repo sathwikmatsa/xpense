@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Wallet
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.layout.WindowInsets
@@ -40,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,7 +61,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.foundation.Image
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -66,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
+import com.money.tracker.data.entity.UpiReminder
 import com.money.tracker.ui.components.TransactionCard
 import com.money.tracker.ui.theme.ExpenseRed
 import com.money.tracker.ui.theme.IncomeGreen
@@ -81,7 +89,8 @@ import kotlin.math.roundToInt
 fun HomeScreen(
     viewModel: HomeViewModel,
     onTransactionClick: (Long) -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onOpenUpiApp: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
@@ -178,6 +187,26 @@ fun HomeScreen(
                             daysPassed = daysPassed,
                             daysInMonth = daysInMonth,
                             currencyFormat = currencyFormat
+                        )
+                    }
+                }
+
+                // UPI Reminders Section
+                if (uiState.upiReminders.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "UPI Reminders",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    items(uiState.upiReminders) { reminder ->
+                        UpiReminderCard(
+                            reminder = reminder,
+                            onDismiss = { viewModel.dismissUpiReminder(reminder.id) },
+                            onOpenApp = { onOpenUpiApp(reminder.packageName) }
                         )
                     }
                 }
@@ -677,6 +706,120 @@ private fun EmptyState() {
                 textAlign = TextAlign.Center
             )
         }
+    }
+}
+
+@Composable
+private fun UpiReminderCard(
+    reminder: UpiReminder,
+    onDismiss: () -> Unit,
+    onOpenApp: () -> Unit
+) {
+    val timeDisplay = getTimeDisplay(reminder.timestamp)
+    val context = LocalContext.current
+
+    val appIcon = remember(reminder.packageName) {
+        try {
+            context.packageManager.getApplicationIcon(reminder.packageName)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+        ),
+        onClick = onOpenApp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (appIcon != null) {
+                    Image(
+                        bitmap = appIcon.toBitmap(width = 96, height = 96).asImageBitmap(),
+                        contentDescription = reminder.appName,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = reminder.appName.first().toString(),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${reminder.appName} payment?",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = timeDisplay,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Dismiss")
+                }
+                Button(
+                    onClick = onOpenApp,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Open ↗")
+                }
+            }
+        }
+    }
+}
+
+private fun getTimeDisplay(timestamp: Long): String {
+    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val time = timeFormat.format(timestamp)
+
+    val calNow = Calendar.getInstance()
+    val calTimestamp = Calendar.getInstance().apply { timeInMillis = timestamp }
+
+    val daysDiff = ((calNow.timeInMillis - calTimestamp.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
+    val isSameDay = calNow.get(Calendar.YEAR) == calTimestamp.get(Calendar.YEAR) &&
+            calNow.get(Calendar.DAY_OF_YEAR) == calTimestamp.get(Calendar.DAY_OF_YEAR)
+
+    val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+    val isYesterday = yesterday.get(Calendar.YEAR) == calTimestamp.get(Calendar.YEAR) &&
+            yesterday.get(Calendar.DAY_OF_YEAR) == calTimestamp.get(Calendar.DAY_OF_YEAR)
+
+    return when {
+        isSameDay -> "Today, $time"
+        isYesterday -> "Yesterday, $time"
+        else -> "$daysDiff days ago, $time"
     }
 }
 
