@@ -12,41 +12,49 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Softer, easier on the eyes
-val IncomeGreen = Color(0xFF66BB6A)
-val ExpenseRed = Color(0xFFEF5350)
-val WarningAmber = Color(0xFFFFB74D)
+// Muted, aesthetic accent colors
+val IncomeGreen = Color(0xFF4CAF7C)        // Sage green
+val ExpenseRed = Color(0xFFE57373)         // Soft coral red
+val WarningAmber = Color(0xFFFFB966)       // Warm amber
+
+// Soft gradient colors for cards
+val GradientStart = Color(0xFF6B7FD7)      // Muted periwinkle blue
+val GradientEnd = Color(0xFF8B7DC7)        // Soft lavender purple
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF5C6BC0),          // Softer indigo
+    primary = Color(0xFF6B7FD7),           // Muted periwinkle
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE8EAF6),
-    onPrimaryContainer = Color(0xFF1A237E),
-    secondary = Color(0xFF26A69A),         // Softer teal
+    primaryContainer = Color(0xFFEEF0F9),
+    onPrimaryContainer = Color(0xFF3D4A7A),
+    secondary = Color(0xFF5DA39B),         // Muted teal
     onSecondary = Color.White,
-    tertiary = Color(0xFF7E57C2),          // Soft purple for gradients
-    background = Color(0xFFFAFAFA),
-    onBackground = Color(0xFF212121),
+    secondaryContainer = Color(0xFFE0F2F0),
+    onSecondaryContainer = Color(0xFF2D5954),
+    tertiary = Color(0xFF8B7DC7),          // Soft lavender
+    background = Color(0xFFF9FAFB),        // Warm off-white
+    onBackground = Color(0xFF2D3142),
     surface = Color.White,
-    onSurface = Color(0xFF212121),
-    surfaceVariant = Color(0xFFECEFF1),
-    onSurfaceVariant = Color(0xFF546E7A)
+    onSurface = Color(0xFF2D3142),
+    surfaceVariant = Color(0xFFF3F4F6),
+    onSurfaceVariant = Color(0xFF6B7280)
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF7986CB),           // Softer indigo for dark
-    onPrimary = Color(0xFF1A237E),
-    primaryContainer = Color(0xFF3949AB),
-    onPrimaryContainer = Color(0xFFC5CAE9),
-    secondary = Color(0xFF4DB6AC),
-    onSecondary = Color.Black,
-    tertiary = Color(0xFF9575CD),          // Soft purple for gradients
-    background = Color(0xFF121212),
-    onBackground = Color(0xFFE0E0E0),
-    surface = Color(0xFF1E1E1E),
-    onSurface = Color(0xFFE0E0E0),
-    surfaceVariant = Color(0xFF2C2C2C),
-    onSurfaceVariant = Color(0xFFB0BEC5)
+    primary = Color(0xFF9BA8E5),           // Lighter periwinkle for dark
+    onPrimary = Color(0xFF2D3A6A),
+    primaryContainer = Color(0xFF4A5899),
+    onPrimaryContainer = Color(0xFFD9DDEF),
+    secondary = Color(0xFF7EC4BB),         // Soft teal for dark
+    onSecondary = Color(0xFF1A3D3A),
+    secondaryContainer = Color(0xFF3D6B66),
+    onSecondaryContainer = Color(0xFFD5EBE8),
+    tertiary = Color(0xFFB5A8E0),          // Soft lavender for dark
+    background = Color(0xFF1A1B23),        // Warm dark
+    onBackground = Color(0xFFE8E9ED),
+    surface = Color(0xFF22242E),
+    onSurface = Color(0xFFE8E9ED),
+    surfaceVariant = Color(0xFF2E3140),
+    onSurfaceVariant = Color(0xFFA0A4B0)
 )
 
 @Composable

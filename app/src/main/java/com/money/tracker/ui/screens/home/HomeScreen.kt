@@ -77,6 +77,8 @@ import com.money.tracker.data.entity.UpiReminder
 import com.money.tracker.ui.components.TransactionCard
 import com.money.tracker.ui.screens.settings.getSavedSharingApp
 import com.money.tracker.ui.theme.ExpenseRed
+import com.money.tracker.ui.theme.GradientEnd
+import com.money.tracker.ui.theme.GradientStart
 import com.money.tracker.ui.theme.IncomeGreen
 import com.money.tracker.ui.theme.WarningAmber
 import android.content.ClipData
@@ -349,19 +351,20 @@ private fun BudgetCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        )
+            containerColor = Color.Transparent
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(
+                    Brush.linearGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                            GradientStart,
+                            GradientEnd
                         )
                     )
                 )
@@ -379,7 +382,7 @@ private fun BudgetCard(
                             text = currentMonth,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = Color.White
                         )
                         Text(
                             text = if (budget != null) {
@@ -388,7 +391,7 @@ private fun BudgetCard(
                                 "Spent this month"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                            color = Color.White.copy(alpha = 0.75f)
                         )
                     }
                     Row {
@@ -396,14 +399,14 @@ private fun BudgetCard(
                             Icon(
                                 imageVector = if (showIncome) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                 contentDescription = if (showIncome) "Hide Details" else "Show Details",
-                                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                tint = Color.White.copy(alpha = 0.85f)
                             )
                         }
                         IconButton(onClick = onEditBudget) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit Budget",
-                                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                tint = Color.White.copy(alpha = 0.85f)
                             )
                         }
                     }
@@ -420,7 +423,7 @@ private fun BudgetCard(
                     },
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
 
                 // Budget progress bar
@@ -433,7 +436,7 @@ private fun BudgetCard(
                             .fillMaxWidth()
                             .height(10.dp)
                             .clip(RoundedCornerShape(5.dp))
-                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f))
+                            .background(Color.White.copy(alpha = 0.2f))
                     ) {
                         Box(
                             modifier = Modifier
@@ -453,12 +456,12 @@ private fun BudgetCard(
                         Text(
                             text = "${currencyFormat.format(totalExpense)} spent",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                            color = Color.White.copy(alpha = 0.75f)
                         )
                         Text(
                             text = "of ${currencyFormat.format(budget)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                            color = Color.White.copy(alpha = 0.75f)
                         )
                     }
                 }
@@ -489,12 +492,12 @@ private fun BudgetCard(
                                     text = currencyFormat.format(totalIncome),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimary
+                                    color = Color.White
                                 )
                                 Text(
                                     text = "Income",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
+                                    color = Color.White.copy(alpha = 0.7f)
                                 )
                             }
 
@@ -503,7 +506,7 @@ private fun BudgetCard(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(48.dp)
-                                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
+                                    .background(Color.White.copy(alpha = 0.2f))
                             )
 
                             // Expenses
@@ -519,12 +522,12 @@ private fun BudgetCard(
                                     text = currencyFormat.format(totalExpense),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimary
+                                    color = Color.White
                                 )
                                 Text(
                                     text = "Expenses",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
+                                    color = Color.White.copy(alpha = 0.7f)
                                 )
                             }
 
@@ -533,7 +536,7 @@ private fun BudgetCard(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(48.dp)
-                                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
+                                    .background(Color.White.copy(alpha = 0.2f))
                             )
 
                             // Net
@@ -550,12 +553,12 @@ private fun BudgetCard(
                                     text = "${if (net >= 0) "+" else ""}${currencyFormat.format(net)}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimary
+                                    color = Color.White
                                 )
                                 Text(
                                     text = "Net",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
+                                    color = Color.White.copy(alpha = 0.7f)
                                 )
                             }
                         }
