@@ -104,4 +104,46 @@ object TransactionNotificationHelper {
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         notificationManager.cancel(transactionId.toInt())
     }
+
+    fun showIncomeNotification(
+        context: Context,
+        amount: Double,
+        description: String,
+        appName: String
+    ) {
+        createNotificationChannel(context)
+
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        val amountStr = currencyFormat.format(amount)
+
+        val title = "$appName: Received $amountStr"
+        val body = "$description\nTap to categorize"
+
+        // Intent to open app with pending transactions
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("open_pending", true)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            System.currentTimeMillis().toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .addAction(0, "Categorize", pendingIntent)
+            .build()
+
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+    }
 }

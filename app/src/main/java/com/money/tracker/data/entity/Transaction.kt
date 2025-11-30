@@ -46,6 +46,10 @@ enum class TransactionType {
 
 enum class TransactionSource {
     UPI,
+    GOOGLE_PAY,
+    PHONEPE,
+    CRED,
+    JUPITER,
     BANK_TRANSFER,
     CREDIT_CARD,
     DEBIT_CARD,

@@ -2,6 +2,7 @@ package com.money.tracker.ui.screens.settings
 
 import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +10,8 @@ import android.content.pm.ResolveInfo
 import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
+import androidx.core.app.NotificationManagerCompat
+import com.money.tracker.service.PaymentNotificationListener
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sms
@@ -167,6 +171,14 @@ fun SettingsScreen(
 
     var isUpiMonitorEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled()) }
 
+    // Check if notification listener is enabled
+    fun isNotificationListenerEnabled(): Boolean {
+        val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
+        return enabledListeners.contains(context.packageName)
+    }
+
+    var isNotificationListenerEnabled by remember { mutableStateOf(isNotificationListenerEnabled()) }
+
     // Sharing app preference
     var selectedSharingApp by remember { mutableStateOf(getSavedSharingApp(context)) }
     var showSharingAppPicker by remember { mutableStateOf(false) }
@@ -178,6 +190,7 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isUpiMonitorEnabled = isAccessibilityServiceEnabled()
+                isNotificationListenerEnabled = isNotificationListenerEnabled()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -238,6 +251,20 @@ fun SettingsScreen(
                 onCheckedChange = {
                     // Open accessibility settings
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    context.startActivity(intent)
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Notification Listener setting (for incoming payments)
+            SettingsToggleItem(
+                icon = Icons.Default.Notifications,
+                title = "Auto-detect income",
+                subtitle = if (isNotificationListenerEnabled) "Detecting incoming UPI payments" else "Auto-add money received via UPI apps",
+                checked = isNotificationListenerEnabled,
+                onCheckedChange = {
+                    // Open notification listener settings
+                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     context.startActivity(intent)
                 }
             )
