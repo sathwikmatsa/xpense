@@ -19,4 +19,9 @@ class UpiReminderRepository(private val upiReminderDao: UpiReminderDao) {
     suspend fun deleteAll() {
         upiReminderDao.deleteAll()
     }
+
+    suspend fun deleteRecentReminders(withinMs: Long = 10_000L) {
+        val since = System.currentTimeMillis() - withinMs
+        upiReminderDao.deleteRecentReminders(since)
+    }
 }

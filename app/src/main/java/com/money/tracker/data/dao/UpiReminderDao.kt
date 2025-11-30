@@ -19,4 +19,7 @@ interface UpiReminderDao {
 
     @Query("DELETE FROM upi_reminders")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM upi_reminders WHERE timestamp > :since")
+    suspend fun deleteRecentReminders(since: Long)
 }

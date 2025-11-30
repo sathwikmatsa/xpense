@@ -1,5 +1,6 @@
 package com.money.tracker.service
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -12,6 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class SmsReceiver : BroadcastReceiver() {
+
+    companion object {
+        private const val UPI_REMINDER_NOTIFICATION_ID = 9999
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
@@ -45,6 +50,14 @@ class SmsReceiver : BroadcastReceiver() {
                     isPending = true // Mark as pending until user confirms
                 )
                 val transactionId = app.transactionRepository.insert(transaction)
+
+                // Dismiss any UPI reminder notification that came in the last 10 seconds
+                // (since SMS confirms the payment, no need for UPI reminder)
+                val notificationManager = context.getSystemService(NotificationManager::class.java)
+                notificationManager.cancel(UPI_REMINDER_NOTIFICATION_ID)
+
+                // Also delete recent UPI reminders from the database (within last 10 seconds)
+                app.upiReminderRepository.deleteRecentReminders(10_000L)
 
                 // Show notification to prompt user
                 TransactionNotificationHelper.showTransactionNotification(
