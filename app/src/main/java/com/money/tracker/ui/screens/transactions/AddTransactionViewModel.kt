@@ -11,6 +11,7 @@ import com.money.tracker.data.entity.SharingApp
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.SharingAppRepository
 import com.money.tracker.data.repository.TransactionRepository
+import com.money.tracker.data.repository.UpiReminderRepository
 import com.money.tracker.util.CategoryRecommender
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,8 @@ import kotlinx.coroutines.launch
 class AddTransactionViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository,
-    private val sharingAppRepository: SharingAppRepository
+    private val sharingAppRepository: SharingAppRepository,
+    private val upiReminderRepository: UpiReminderRepository
 ) : ViewModel() {
 
     val categories: Flow<List<Category>> = categoryRepository.allCategories
@@ -103,6 +105,12 @@ class AddTransactionViewModel(
         }
     }
 
+    fun deleteUpiReminder(reminderId: Long) {
+        viewModelScope.launch {
+            upiReminderRepository.deleteById(reminderId)
+        }
+    }
+
     fun createCategory(name: String, emoji: String) {
         viewModelScope.launch {
             categoryRepository.insert(Category(name = name, emoji = emoji))
@@ -112,11 +120,12 @@ class AddTransactionViewModel(
     class Factory(
         private val transactionRepository: TransactionRepository,
         private val categoryRepository: CategoryRepository,
-        private val sharingAppRepository: SharingAppRepository
+        private val sharingAppRepository: SharingAppRepository,
+        private val upiReminderRepository: UpiReminderRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AddTransactionViewModel(transactionRepository, categoryRepository, sharingAppRepository) as T
+            return AddTransactionViewModel(transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository) as T
         }
     }
 }

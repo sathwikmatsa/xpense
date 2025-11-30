@@ -12,7 +12,7 @@ interface UpiReminderDao {
     fun getAllReminders(): Flow<List<UpiReminder>>
 
     @Insert
-    suspend fun insert(reminder: UpiReminder)
+    suspend fun insert(reminder: UpiReminder): Long
 
     @Query("DELETE FROM upi_reminders WHERE id = :id")
     suspend fun deleteById(id: Long)

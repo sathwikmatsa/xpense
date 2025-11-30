@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
 
         val app = application as MoneyTrackerApp
         val openAddTransaction = intent?.getBooleanExtra("open_add_transaction", false) ?: false
+        val upiReminderId = intent?.getLongExtra("upi_reminder_id", -1L) ?: -1L
 
         setContent {
             MoneyTrackerTheme {
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
                     upiReminderRepository = app.upiReminderRepository,
                     sharingAppRepository = app.sharingAppRepository,
                     openAddTransaction = openAddTransaction,
+                    upiReminderId = upiReminderId,
                     onOpenUpiApp = { packageName -> openUpiApp(packageName) }
                 )
             }

@@ -8,8 +8,8 @@ class UpiReminderRepository(private val upiReminderDao: UpiReminderDao) {
 
     val allReminders: Flow<List<UpiReminder>> = upiReminderDao.getAllReminders()
 
-    suspend fun insert(reminder: UpiReminder) {
-        upiReminderDao.insert(reminder)
+    suspend fun insert(reminder: UpiReminder): Long {
+        return upiReminderDao.insert(reminder)
     }
 
     suspend fun deleteById(id: Long) {

@@ -95,4 +95,10 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     suspend fun getRecentCategorizedTransactions(limit: Int = 500): List<Transaction> {
         return transactionDao.getRecentCategorizedTransactions(limit)
     }
+
+    // Check if a similar pending transaction exists (for deduplication)
+    suspend fun hasRecentPendingTransaction(amount: Double, withinMs: Long = 10_000L): Boolean {
+        val since = System.currentTimeMillis() - withinMs
+        return transactionDao.hasRecentPendingTransaction(since, amount) > 0
+    }
 }

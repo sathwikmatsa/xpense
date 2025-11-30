@@ -11,6 +11,12 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.core.app.NotificationCompat
 import com.money.tracker.MainActivity
 import com.money.tracker.R
+import com.money.tracker.data.AppDatabase
+import com.money.tracker.data.entity.UpiReminder
+import com.money.tracker.data.repository.UpiReminderRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class UpiMonitorService : AccessibilityService() {
 
@@ -21,15 +27,16 @@ class UpiMonitorService : AccessibilityService() {
         private const val PIN_NOTIFICATION_DELAY_MS = 3000L // Wait 3 seconds after PIN entry
 
         // Package names of popular UPI apps
-        // Note: Only include apps that don't send SMS with transaction details
-        // Apps like Jupiter send SMS, so they're handled by SmsReceiver instead
+        // Note: Some apps (like Jupiter) also send SMS - the SmsReceiver will
+        // dismiss the UPI reminder if SMS confirms the transaction
         private val UPI_PACKAGES = setOf(
             "com.google.android.apps.nbu.paisa.user", // GPay
             "com.phonepe.app", // PhonePe
             "net.one97.paytm", // Paytm
             "in.org.npci.upiapp", // BHIM
             "com.dreamplug.androidapp", // CRED
-            "in.amazon.mShop.android.shopping" // Amazon Pay
+            "in.amazon.mShop.android.shopping", // Amazon Pay
+            "money.jupiter" // Jupiter
         )
 
         // Keywords that indicate a successful payment
@@ -169,55 +176,54 @@ class UpiMonitorService : AccessibilityService() {
     private fun showTransactionPrompt(packageName: String?) {
         val appName = packageName?.let { getAppName(it) } ?: "UPI App"
 
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("open_add_transaction", true)
+        // Save reminder to DB and show notification with the reminder ID
+        val db = AppDatabase.getDatabase(this)
+        val repository = UpiReminderRepository(db.upiReminderDao())
+        CoroutineScope(Dispatchers.IO).launch {
+            val reminderId = repository.insert(UpiReminder(
+                packageName = packageName ?: "unknown",
+                appName = appName
+            ))
+
+            // Build and show notification on main thread with the reminder ID
+            val intent = Intent(this@UpiMonitorService, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("open_add_transaction", true)
+                putExtra("upi_reminder_id", reminderId)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                this@UpiMonitorService,
+                reminderId.toInt(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val dismissIntent = Intent(this@UpiMonitorService, UpiNotificationReceiver::class.java).apply {
+                action = UpiNotificationReceiver.ACTION_DISMISS
+                putExtra(UpiNotificationReceiver.EXTRA_REMINDER_ID, reminderId)
+            }
+            val dismissPendingIntent = PendingIntent.getBroadcast(
+                this@UpiMonitorService,
+                reminderId.toInt(),
+                dismissIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(this@UpiMonitorService, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("Made a payment?")
+                .setContentText("Tap to add your $appName transaction")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .addAction(0, "Dismiss", dismissPendingIntent)
+                .addAction(0, "Add", pendingIntent)
+                .build()
+
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.notify(NOTIFICATION_ID, notification)
         }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val dismissIntent = Intent(this, UpiNotificationReceiver::class.java).apply {
-            action = UpiNotificationReceiver.ACTION_DISMISS
-        }
-        val dismissPendingIntent = PendingIntent.getBroadcast(
-            this,
-            0,
-            dismissIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Intent for when notification is swiped away (save reminder)
-        val swipeIntent = Intent(this, UpiNotificationReceiver::class.java).apply {
-            action = UpiNotificationReceiver.ACTION_SWIPED
-            putExtra(UpiNotificationReceiver.EXTRA_PACKAGE_NAME, packageName ?: "unknown")
-            putExtra(UpiNotificationReceiver.EXTRA_APP_NAME, appName)
-        }
-        val swipePendingIntent = PendingIntent.getBroadcast(
-            this,
-            1, // Different request code to avoid overwriting
-            swipeIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Made a payment?")
-            .setContentText("Tap to add your $appName transaction")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setDeleteIntent(swipePendingIntent)
-            .addAction(0, "Dismiss", dismissPendingIntent)
-            .addAction(0, "Add", pendingIntent)
-            .build()
-
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
     }
 
     private fun cancelNotification() {

@@ -70,7 +70,6 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.money.tracker.DISMISS_UPI_NOTIFICATION" />
-                <action android:name="com.money.tracker.SWIPED_UPI_NOTIFICATION" />
             </intent-filter>
         </receiver>
 

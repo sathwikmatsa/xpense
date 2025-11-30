@@ -90,6 +90,14 @@ interface TransactionDao {
         LIMIT :limit
     """)
     suspend fun getRecentCategorizedTransactions(limit: Int = 500): List<Transaction>
+
+    // Check if a similar pending transaction exists (for deduplication)
+    @Query("""
+        SELECT COUNT(*) FROM transactions
+        WHERE isPending = 1 AND isManual = 0 AND createdAt > :since
+        AND ABS(amount - :amount) < 0.01
+    """)
+    suspend fun hasRecentPendingTransaction(since: Long, amount: Double): Int
 }
 
 data class CategoryTotal(

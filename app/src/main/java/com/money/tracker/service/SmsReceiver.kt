@@ -7,6 +7,7 @@ import android.content.Intent
 import android.provider.Telephony
 import com.money.tracker.MoneyTrackerApp
 import com.money.tracker.data.entity.Transaction
+import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.util.SmsParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,14 @@ class SmsReceiver : BroadcastReceiver() {
 
             // Save as pending transaction and show notification
             CoroutineScope(Dispatchers.IO).launch {
+                // For INCOME transactions, check if notification listener already created it
+                // (PaymentNotificationListener handles incoming payments from app notifications)
+                if (parsed.type == TransactionType.INCOME &&
+                    app.transactionRepository.hasRecentPendingTransaction(parsed.amount)) {
+                    // Skip SMS - notification listener already handled this incoming payment
+                    return@launch
+                }
+
                 val transaction = Transaction(
                     amount = parsed.amount,
                     type = parsed.type,
@@ -56,7 +65,7 @@ class SmsReceiver : BroadcastReceiver() {
                 val notificationManager = context.getSystemService(NotificationManager::class.java)
                 notificationManager.cancel(UPI_REMINDER_NOTIFICATION_ID)
 
-                // Also delete recent UPI reminders from the database (within last 10 seconds)
+                // Delete recent UPI reminders from the database (within last 10 seconds)
                 app.upiReminderRepository.deleteRecentReminders(10_000L)
 
                 // Show notification to prompt user

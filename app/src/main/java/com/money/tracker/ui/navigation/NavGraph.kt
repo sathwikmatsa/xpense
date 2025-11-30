@@ -28,6 +28,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -92,15 +95,20 @@ fun MoneyTrackerNavGraph(
     upiReminderRepository: UpiReminderRepository,
     sharingAppRepository: SharingAppRepository,
     openAddTransaction: Boolean = false,
+    upiReminderId: Long = -1L,
     onOpenUpiApp: (String) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    // Track the UPI reminder ID if we came from notification
+    var currentUpiReminderId by remember { mutableStateOf(-1L) }
+
     // Navigate to add transaction if requested via intent
-    androidx.compose.runtime.LaunchedEffect(openAddTransaction) {
+    androidx.compose.runtime.LaunchedEffect(openAddTransaction, upiReminderId) {
         if (openAddTransaction) {
+            currentUpiReminderId = upiReminderId
             navController.navigate(Screen.AddTransaction.route)
         }
     }
@@ -155,12 +163,18 @@ fun MoneyTrackerNavGraph(
 
             composable(Screen.AddTransaction.route) {
                 val viewModel: AddTransactionViewModel = viewModel(
-                    factory = AddTransactionViewModel.Factory(transactionRepository, categoryRepository, sharingAppRepository)
+                    factory = AddTransactionViewModel.Factory(transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository)
                 )
                 AddTransactionScreen(
                     viewModel = viewModel,
                     onNavigateBack = { navController.popBackStack() },
-                    onSaved = { navController.popBackStack() }
+                    onSaved = {
+                        if (currentUpiReminderId > 0) {
+                            viewModel.deleteUpiReminder(currentUpiReminderId)
+                            currentUpiReminderId = -1L
+                        }
+                        navController.popBackStack()
+                    }
                 )
             }
 
