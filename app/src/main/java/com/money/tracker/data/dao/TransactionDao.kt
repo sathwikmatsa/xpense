@@ -81,6 +81,15 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET splitSynced = 1 WHERE id = :id")
     suspend fun markSplitSynced(id: Long)
+
+    // For category recommendations - get recent transactions with categories
+    @Query("""
+        SELECT * FROM transactions
+        WHERE categoryId IS NOT NULL AND isPending = 0
+        ORDER BY date DESC
+        LIMIT :limit
+    """)
+    suspend fun getRecentCategorizedTransactions(limit: Int = 500): List<Transaction>
 }
 
 data class CategoryTotal(

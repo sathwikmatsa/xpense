@@ -90,4 +90,9 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     suspend fun markSplitSynced(id: Long) {
         transactionDao.markSplitSynced(id)
     }
+
+    // For category recommendations
+    suspend fun getRecentCategorizedTransactions(limit: Int = 500): List<Transaction> {
+        return transactionDao.getRecentCategorizedTransactions(limit)
+    }
 }

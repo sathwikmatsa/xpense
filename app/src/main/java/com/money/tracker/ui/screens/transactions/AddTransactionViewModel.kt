@@ -11,7 +11,11 @@ import com.money.tracker.data.entity.SharingApp
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.SharingAppRepository
 import com.money.tracker.data.repository.TransactionRepository
+import com.money.tracker.util.CategoryRecommender
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AddTransactionViewModel(
@@ -22,6 +26,43 @@ class AddTransactionViewModel(
 
     val categories: Flow<List<Category>> = categoryRepository.allCategories
     val sharingApps: Flow<List<SharingApp>> = sharingAppRepository.enabledApps
+
+    private val categoryRecommender = CategoryRecommender()
+    private var historicalTransactions: List<Transaction> = emptyList()
+
+    private val _recommendedCategories = MutableStateFlow<List<Category>>(emptyList())
+    val recommendedCategories: StateFlow<List<Category>> = _recommendedCategories.asStateFlow()
+
+    init {
+        // Load historical transactions for recommendations
+        viewModelScope.launch {
+            historicalTransactions = transactionRepository.getRecentCategorizedTransactions(500)
+        }
+    }
+
+    /**
+     * Get recommended categories based on transaction details.
+     * Call this when transaction details change (amount, description, source, etc.)
+     */
+    fun updateCategoryRecommendations(
+        allCategories: List<Category>,
+        merchant: String?,
+        description: String,
+        amount: Double,
+        source: TransactionSource,
+        type: TransactionType
+    ) {
+        val recommended = categoryRecommender.getRecommendedCategories(
+            allCategories = allCategories,
+            historicalTransactions = historicalTransactions,
+            merchant = merchant,
+            description = description,
+            amount = amount,
+            source = source,
+            type = type
+        )
+        _recommendedCategories.value = recommended
+    }
 
     fun saveTransaction(
         amount: Double,

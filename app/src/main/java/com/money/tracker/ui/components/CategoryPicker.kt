@@ -51,6 +51,7 @@ import com.money.tracker.data.entity.Category
 @Composable
 fun CategoryPickerDialog(
     categories: List<Category>,
+    recommendedCategories: List<Category> = emptyList(),
     selectedCategory: Category?,
     onCategorySelected: (Category) -> Unit,
     onCreateCategory: (name: String, emoji: String) -> Unit,
@@ -59,12 +60,24 @@ fun CategoryPickerDialog(
     var searchQuery by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    val filteredCategories = remember(searchQuery, categories) {
+    // Use recommended order if available and no search query
+    val orderedCategories = remember(searchQuery, categories, recommendedCategories) {
         if (searchQuery.isBlank()) {
-            categories
+            if (recommendedCategories.isNotEmpty()) {
+                recommendedCategories
+            } else {
+                categories.filter { it.parentId == null }.sortedBy { it.name.lowercase() }
+            }
         } else {
-            categories.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            categories.filter {
+                it.parentId == null && it.name.contains(searchQuery, ignoreCase = true)
+            }
         }
+    }
+
+    // Get top 5 recommendations for highlighting
+    val topRecommendedIds = remember(recommendedCategories) {
+        recommendedCategories.take(5).map { it.id }.toSet()
     }
 
     if (showCreateDialog) {
@@ -116,18 +129,51 @@ fun CategoryPickerDialog(
                     modifier = Modifier.heightIn(max = 300.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
-                    items(filteredCategories) { category ->
+                    // Show "Suggested" header if we have recommendations and no search
+                    if (searchQuery.isBlank() && topRecommendedIds.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Suggested",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
+                            )
+                        }
+                    }
+
+                    items(orderedCategories) { category ->
+                        val isRecommended = category.id in topRecommendedIds
+                        val showDivider = searchQuery.isBlank() &&
+                            topRecommendedIds.isNotEmpty() &&
+                            orderedCategories.indexOf(category) == topRecommendedIds.size - 1
+
                         CategoryItem(
                             category = category,
                             isSelected = category.id == selectedCategory?.id,
+                            isRecommended = isRecommended && searchQuery.isBlank(),
                             onClick = {
                                 onCategorySelected(category)
                                 onDismiss()
                             }
                         )
+
+                        // Add divider after last recommended category
+                        if (showDivider && orderedCategories.size > topRecommendedIds.size) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+                            Text(
+                                text = "All Categories",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                            )
+                        }
                     }
 
-                    if (filteredCategories.isEmpty() && searchQuery.isNotBlank()) {
+                    if (orderedCategories.isEmpty() && searchQuery.isNotBlank()) {
                         item {
                             Text(
                                 text = "No categories found",
@@ -170,17 +216,20 @@ fun CategoryPickerDialog(
 private fun CategoryItem(
     category: Category,
     isSelected: Boolean,
+    isRecommended: Boolean = false,
     onClick: () -> Unit
 ) {
+    val backgroundColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        isRecommended -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
+        else -> MaterialTheme.colorScheme.surface
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                else MaterialTheme.colorScheme.surface,
-                RoundedCornerShape(8.dp)
-            )
+            .background(backgroundColor, RoundedCornerShape(8.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -190,7 +239,8 @@ private fun CategoryItem(
                 modifier = Modifier
                     .size(36.dp)
                     .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
+                        if (isRecommended) MaterialTheme.colorScheme.secondaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
                         RoundedCornerShape(8.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -204,7 +254,8 @@ private fun CategoryItem(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = category.name,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isRecommended) FontWeight.Medium else FontWeight.Normal
             )
         }
 

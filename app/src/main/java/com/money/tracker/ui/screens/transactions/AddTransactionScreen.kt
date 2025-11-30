@@ -58,6 +58,7 @@ import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -93,6 +94,7 @@ fun AddTransactionScreen(
     onSaved: () -> Unit
 ) {
     val categories by viewModel.categories.collectAsState(initial = emptyList())
+    val recommendedCategories by viewModel.recommendedCategories.collectAsState()
 
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -119,9 +121,25 @@ fun AddTransactionScreen(
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
 
+    // Update category recommendations when transaction details change
+    LaunchedEffect(amount, description, selectedSource, selectedType, categories) {
+        if (categories.isNotEmpty()) {
+            val amountValue = amount.toDoubleOrNull() ?: 0.0
+            viewModel.updateCategoryRecommendations(
+                allCategories = categories,
+                merchant = null, // No merchant for manual transactions
+                description = description,
+                amount = amountValue,
+                source = selectedSource,
+                type = selectedType
+            )
+        }
+    }
+
     if (showCategoryPicker) {
         CategoryPickerDialog(
             categories = categories,
+            recommendedCategories = recommendedCategories,
             selectedCategory = selectedCategory,
             onCategorySelected = { selectedCategory = it },
             onCreateCategory = { name, emoji ->
