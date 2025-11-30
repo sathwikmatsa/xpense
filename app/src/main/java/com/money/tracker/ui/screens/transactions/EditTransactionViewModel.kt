@@ -71,6 +71,11 @@ class EditTransactionViewModel(
                 else -> amount
             }
 
+            // Reset splitSynced if split details changed
+            val splitChanged = existing.isSplit != isSplit ||
+                existing.totalAmount != amount ||
+                existing.amount != myShare
+
             val updated = existing.copy(
                 amount = myShare,
                 description = description,
@@ -82,7 +87,8 @@ class EditTransactionViewModel(
                 isSplit = isSplit,
                 splitNumerator = if (customMyShare != null) 0 else splitNumerator,
                 splitDenominator = if (customMyShare != null) 0 else splitDenominator,
-                totalAmount = if (isSplit) amount else 0.0
+                totalAmount = if (isSplit) amount else 0.0,
+                splitSynced = if (isSplit && splitChanged) false else existing.splitSynced
             )
             transactionRepository.update(updated)
             _uiState.value = _uiState.value.copy(isSaved = true)

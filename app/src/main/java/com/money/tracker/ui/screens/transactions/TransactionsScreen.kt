@@ -62,8 +62,14 @@ enum class TransactionTypeFilter {
     ALL, INCOME, EXPENSE
 }
 
+enum class SplitFilter(val label: String) {
+    ALL("All"),
+    SPLIT_ONLY("Split"),
+    NON_SPLIT("Non-Split")
+}
+
 enum class TimeRangeFilter(val label: String, val days: Int?) {
-    ALL("All Time", null),
+    YEAR("Last Year", 365),
     TODAY("Today", 0),
     WEEK("Last 7 Days", 7),
     MONTH("Last 30 Days", 30),
@@ -80,7 +86,8 @@ fun TransactionsScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     var typeFilter by remember { mutableStateOf(TransactionTypeFilter.ALL) }
-    var timeRangeFilter by remember { mutableStateOf(TimeRangeFilter.ALL) }
+    var timeRangeFilter by remember { mutableStateOf(TimeRangeFilter.YEAR) }
+    var splitFilter by remember { mutableStateOf(SplitFilter.ALL) }
     var selectedCategories by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showFilterSheet by remember { mutableStateOf(false) }
     var customStartDate by remember { mutableStateOf<Long?>(null) }
@@ -92,7 +99,6 @@ fun TransactionsScreen(
     // Calculate time range
     val (startTime, endTime) = remember(timeRangeFilter, customStartDate, customEndDate) {
         when (timeRangeFilter) {
-            TimeRangeFilter.ALL -> Pair(0L, Long.MAX_VALUE)
             TimeRangeFilter.CUSTOM -> {
                 val start = customStartDate?.let {
                     Calendar.getInstance().apply {
@@ -156,8 +162,13 @@ fun TransactionsScreen(
         }
         val matchesTime = txn.date >= startTime && txn.date <= endTime
         val matchesCategory = expandedCategories.isEmpty() || txn.categoryId in expandedCategories
+        val matchesSplit = when (splitFilter) {
+            SplitFilter.ALL -> true
+            SplitFilter.SPLIT_ONLY -> txn.isSplit
+            SplitFilter.NON_SPLIT -> !txn.isSplit
+        }
 
-        matchesType && matchesTime && matchesCategory
+        matchesType && matchesTime && matchesCategory && matchesSplit
     }
 
     // Group transactions by date
@@ -165,11 +176,12 @@ fun TransactionsScreen(
         SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(transaction.date))
     }
 
-    // Count active filters
+    // Count active filters (YEAR is default, so don't count it)
     val activeFilterCount = listOfNotNull(
         if (typeFilter != TransactionTypeFilter.ALL) typeFilter else null,
-        if (timeRangeFilter != TimeRangeFilter.ALL) timeRangeFilter else null,
-        if (selectedCategories.isNotEmpty()) "categories" else null
+        if (timeRangeFilter != TimeRangeFilter.YEAR) timeRangeFilter else null,
+        if (selectedCategories.isNotEmpty()) "categories" else null,
+        if (splitFilter != SplitFilter.ALL) splitFilter else null
     ).size
 
     // Custom date range label for display
@@ -202,10 +214,13 @@ fun TransactionsScreen(
                         selectedCategories + categoryId
                     }
                 },
+                splitFilter = splitFilter,
+                onSplitFilterChange = { splitFilter = it },
                 onClearFilters = {
                     typeFilter = TransactionTypeFilter.ALL
-                    timeRangeFilter = TimeRangeFilter.ALL
+                    timeRangeFilter = TimeRangeFilter.YEAR
                     selectedCategories = emptySet()
+                    splitFilter = SplitFilter.ALL
                     customStartDate = null
                     customEndDate = null
                 }
@@ -288,11 +303,11 @@ fun TransactionsScreen(
                                 )
                             }
                         }
-                        if (timeRangeFilter != TimeRangeFilter.ALL) {
+                        if (timeRangeFilter != TimeRangeFilter.YEAR) {
                             item {
                                 AssistChip(
                                     onClick = {
-                                        timeRangeFilter = TimeRangeFilter.ALL
+                                        timeRangeFilter = TimeRangeFilter.YEAR
                                         customStartDate = null
                                         customEndDate = null
                                     },
@@ -308,6 +323,17 @@ fun TransactionsScreen(
                                 AssistChip(
                                     onClick = { selectedCategories = emptySet() },
                                     label = { Text("${selectedCategories.size} ${if (selectedCategories.size == 1) "category" else "categories"}") },
+                                    trailingIcon = {
+                                        Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.padding(start = 4.dp))
+                                    }
+                                )
+                            }
+                        }
+                        if (splitFilter != SplitFilter.ALL) {
+                            item {
+                                AssistChip(
+                                    onClick = { splitFilter = SplitFilter.ALL },
+                                    label = { Text(splitFilter.label) },
                                     trailingIcon = {
                                         Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.padding(start = 4.dp))
                                     }
@@ -380,6 +406,8 @@ private fun FilterBottomSheet(
     onCustomEndDateChange: (Long?) -> Unit,
     selectedCategories: Set<Long>,
     onCategoryToggle: (Long) -> Unit,
+    splitFilter: SplitFilter,
+    onSplitFilterChange: (SplitFilter) -> Unit,
     onClearFilters: () -> Unit
 ) {
     var showStartDatePicker by remember { mutableStateOf(false) }
@@ -497,6 +525,24 @@ private fun FilterBottomSheet(
                     selected = typeFilter == filter,
                     onClick = { onTypeFilterChange(filter) },
                     label = { Text(filter.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                )
+            }
+        }
+
+        // Split Filter
+        Text(
+            text = "Split Status",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Medium
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SplitFilter.entries.forEach { filter ->
+                FilterChip(
+                    selected = splitFilter == filter,
+                    onClick = { onSplitFilterChange(filter) },
+                    label = { Text(filter.label) }
                 )
             }
         }
