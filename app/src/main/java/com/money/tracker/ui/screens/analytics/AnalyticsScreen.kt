@@ -72,6 +72,7 @@ fun AnalyticsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val trendState by viewModel.trendState.collectAsState()
+    val splitSummaryState by viewModel.splitSummaryState.collectAsState()
     val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
     var showPieChart by remember { mutableStateOf(false) }
 
@@ -118,6 +119,16 @@ fun AnalyticsScreen(
                     onCategoryToggle = { viewModel.toggleTrendCategory(it) },
                     onClearCategories = { viewModel.clearTrendCategories() }
                 )
+            }
+
+            // Split Summary Widget (only show if there's any split data)
+            if (splitSummaryState.totalPaidForOthers > 0) {
+                item {
+                    SplitSummaryWidget(
+                        state = splitSummaryState,
+                        currencyFormat = currencyFormat
+                    )
+                }
             }
 
             // Bottom spacing
@@ -999,6 +1010,294 @@ private fun PieChartView(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = currencyFormat.format(item.amount),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "${String.format("%.1f", item.percentage)}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplitSummaryWidget(
+    state: SplitSummaryState,
+    currencyFormat: NumberFormat
+) {
+    var showPieChart by remember { mutableStateOf(false) }
+    val barColor = MaterialTheme.colorScheme.secondary
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Paid for Others",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Last 6 months",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = currencyFormat.format(state.totalPaidForOthers),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    if (state.categoryBreakdown.isNotEmpty()) {
+                        IconButton(onClick = { showPieChart = !showPieChart }) {
+                            Icon(
+                                imageVector = if (showPieChart) Icons.Default.BarChart else Icons.Default.PieChart,
+                                contentDescription = if (showPieChart) "Show trend" else "Show categories"
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (showPieChart && state.categoryBreakdown.isNotEmpty()) {
+                // Pie chart view
+                SplitCategoryPieChart(
+                    items = state.categoryBreakdown,
+                    currencyFormat = currencyFormat
+                )
+            } else if (state.monthlyData.isNotEmpty() && state.maxAmount > 0) {
+                // Bar chart view
+                // Format amount for Y-axis (compact format)
+                fun formatCompact(amount: Double): String {
+                    return when {
+                        amount >= 100000 -> "${(amount / 100000).toInt()}L"
+                        amount >= 1000 -> "${(amount / 1000).toInt()}K"
+                        else -> amount.toInt().toString()
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Y-axis labels
+                    Column(
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(100.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = formatCompact(state.maxAmount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = labelColor,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = formatCompact(state.maxAmount / 2),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = labelColor,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "0",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = labelColor,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Chart area
+                    Column(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val barWidth = 24.dp.toPx()
+                                val slotWidth = size.width / state.monthlyData.size
+                                val maxBarHeight = size.height
+
+                                // Draw grid lines
+                                listOf(0f, 0.5f, 1f).forEach { fraction ->
+                                    val y = size.height * (1 - fraction)
+                                    drawLine(
+                                        color = gridColor,
+                                        start = Offset(0f, y),
+                                        end = Offset(size.width, y),
+                                        strokeWidth = 1.dp.toPx()
+                                    )
+                                }
+
+                                // Draw bars
+                                state.monthlyData.forEachIndexed { index, item ->
+                                    val barHeight = if (state.maxAmount > 0) {
+                                        (item.paidForOthers / state.maxAmount * maxBarHeight).toFloat()
+                                    } else 0f
+
+                                    val slotCenter = slotWidth * index + slotWidth / 2
+                                    val x = slotCenter - barWidth / 2
+                                    val y = size.height - barHeight
+
+                                    if (barHeight > 0) {
+                                        drawRoundRect(
+                                            color = barColor,
+                                            topLeft = Offset(x, y),
+                                            size = Size(barWidth, barHeight),
+                                            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // X-axis labels
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                        ) {
+                            state.monthlyData.forEach { item ->
+                                Text(
+                                    text = item.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = labelColor,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No split data",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SplitCategoryPieChart(
+    items: List<SplitCategoryItem>,
+    currencyFormat: NumberFormat
+) {
+    Column {
+        // Pie Chart
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.8f)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(
+                modifier = Modifier.size(120.dp)
+            ) {
+                val strokeWidth = 28.dp.toPx()
+                val radius = (size.minDimension - strokeWidth) / 2
+                val center = Offset(size.width / 2, size.height / 2)
+
+                var startAngle = -90f
+
+                items.forEachIndexed { index, item ->
+                    val sweepAngle = (item.percentage / 100f) * 360f
+                    val color = pieChartColors[index % pieChartColors.size]
+
+                    drawArc(
+                        color = color,
+                        startAngle = startAngle,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeWidth)
+                    )
+
+                    startAngle += sweepAngle
+                }
+            }
+        }
+
+        // Legend
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items.forEachIndexed { index, item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(pieChartColors[index % pieChartColors.size])
+                        )
+                        Text(
+                            text = item.emoji,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = item.categoryName,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

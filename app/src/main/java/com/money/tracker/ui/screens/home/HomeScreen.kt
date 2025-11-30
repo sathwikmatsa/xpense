@@ -188,9 +188,20 @@ fun HomeScreen(
                         BudgetInsights(
                             budget = uiState.budget!!,
                             totalExpense = uiState.totalExpense,
+                            paidForOthers = uiState.paidForOthers,
                             daysRemaining = daysRemaining,
                             daysPassed = daysPassed,
                             daysInMonth = daysInMonth,
+                            currencyFormat = currencyFormat
+                        )
+                    }
+                }
+
+                // Paid for Others card (when no budget but has split transactions)
+                if (uiState.budget == null && uiState.paidForOthers > 0) {
+                    item {
+                        PaidForOthersCard(
+                            amount = uiState.paidForOthers,
                             currencyFormat = currencyFormat
                         )
                     }
@@ -559,6 +570,7 @@ private fun BudgetCard(
 private fun BudgetInsights(
     budget: Double,
     totalExpense: Double,
+    paidForOthers: Double,
     daysRemaining: Int,
     daysPassed: Int,
     daysInMonth: Int,
@@ -576,29 +588,83 @@ private fun BudgetInsights(
         else -> "Over" to ExpenseRed
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Daily Allowance
-        InsightCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.Wallet,
-            title = "Daily Budget",
-            value = currencyFormat.format(dailyAllowance),
-            subtitle = "$daysRemaining days left",
-            accentColor = if (remaining > 0) IncomeGreen else ExpenseRed
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Daily Allowance
+            InsightCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Wallet,
+                title = "Daily Budget",
+                value = currencyFormat.format(dailyAllowance),
+                subtitle = "$daysRemaining days left",
+                accentColor = if (remaining > 0) IncomeGreen else ExpenseRed
+            )
 
-        // Spending Pace
-        InsightCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.Speed,
-            title = "Spending Pace",
-            value = "${paceStatus.first}",
-            subtitle = "$spendingPace% of expected",
-            accentColor = paceStatus.second
+            // Spending Pace
+            InsightCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Speed,
+                title = "Spending Pace",
+                value = "${paceStatus.first}",
+                subtitle = "$spendingPace% of expected",
+                accentColor = paceStatus.second
+            )
+        }
+
+        // Paid for Others (only show if > 0)
+        if (paidForOthers > 0) {
+            PaidForOthersCard(
+                amount = paidForOthers,
+                currencyFormat = currencyFormat
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaidForOthersCard(
+    amount: Double,
+    currencyFormat: NumberFormat
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
         )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Paid for Others",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = currencyFormat.format(amount),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+            Text(
+                text = "This month",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

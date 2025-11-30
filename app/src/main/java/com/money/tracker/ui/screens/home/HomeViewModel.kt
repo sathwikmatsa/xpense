@@ -28,6 +28,7 @@ data class HomeUiState(
     val categories: Map<Long, Category> = emptyMap(),
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
+    val paidForOthers: Double = 0.0,
     val budget: Double? = null,
     val showIncome: Boolean = false,
     val isLoading: Boolean = true
@@ -88,6 +89,11 @@ class HomeViewModel(
         @Suppress("UNCHECKED_CAST")
         val unsyncedSplitTransactions = values[8] as List<Transaction>
 
+        // Calculate paid for others from split transactions
+        val paidForOthers = transactions
+            .filter { it.isSplit && !it.isPending }
+            .sumOf { it.totalAmount - it.amount }
+
         HomeUiState(
             transactions = transactions.filter { !it.isPending },
             pendingTransactions = pendingTransactions,
@@ -96,6 +102,7 @@ class HomeViewModel(
             categories = categories.associateBy { it.id },
             totalIncome = income ?: 0.0,
             totalExpense = expense ?: 0.0,
+            paidForOthers = paidForOthers,
             budget = budget?.amount,
             showIncome = showIncome,
             isLoading = false

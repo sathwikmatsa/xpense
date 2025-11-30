@@ -69,6 +69,27 @@ data class TrendUiState(
     val categories: List<Category> = emptyList()
 )
 
+data class SplitSummaryItem(
+    val label: String,
+    val paidForOthers: Double,
+    val date: Long
+)
+
+data class SplitCategoryItem(
+    val categoryId: Long,
+    val categoryName: String,
+    val emoji: String,
+    val amount: Double,
+    val percentage: Float
+)
+
+data class SplitSummaryState(
+    val monthlyData: List<SplitSummaryItem> = emptyList(),
+    val categoryBreakdown: List<SplitCategoryItem> = emptyList(),
+    val totalPaidForOthers: Double = 0.0,
+    val maxAmount: Double = 0.0
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AnalyticsViewModel(
     private val transactionRepository: TransactionRepository,
@@ -78,6 +99,97 @@ class AnalyticsViewModel(
     private val _selectedTimeRange = MutableStateFlow(AnalyticsTimeRange.MONTH)
     private val _trendTimeRange = MutableStateFlow(TrendTimeRange.WEEK)
     private val _selectedTrendCategories = MutableStateFlow<Set<Long>>(emptySet())
+
+    // Split summary: 6-month rolling window
+    val splitSummaryState: StateFlow<SplitSummaryState> = combine(
+        transactionRepository.allTransactions,
+        categoryRepository.allCategories
+    ) { transactions, categories ->
+        // Get last 6 months of data
+        val monthData = (0 until 6).map { monthOffset ->
+            val calEnd = Calendar.getInstance()
+            calEnd.add(Calendar.MONTH, -monthOffset)
+            calEnd.set(Calendar.DAY_OF_MONTH, calEnd.getActualMaximum(Calendar.DAY_OF_MONTH))
+            calEnd.set(Calendar.HOUR_OF_DAY, 23)
+            calEnd.set(Calendar.MINUTE, 59)
+            calEnd.set(Calendar.SECOND, 59)
+            val monthEnd = calEnd.timeInMillis
+
+            val calStart = Calendar.getInstance()
+            calStart.add(Calendar.MONTH, -monthOffset)
+            calStart.set(Calendar.DAY_OF_MONTH, 1)
+            calStart.set(Calendar.HOUR_OF_DAY, 0)
+            calStart.set(Calendar.MINUTE, 0)
+            calStart.set(Calendar.SECOND, 0)
+            calStart.set(Calendar.MILLISECOND, 0)
+            val monthStart = calStart.timeInMillis
+
+            val paidForOthers = transactions
+                .filter { it.isSplit && !it.isPending && it.date in monthStart..monthEnd }
+                .sumOf { it.totalAmount - it.amount }
+
+            val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+            SplitSummaryItem(
+                label = monthFormat.format(monthStart),
+                paidForOthers = paidForOthers,
+                date = monthStart
+            )
+        }.reversed()
+
+        val total = monthData.sumOf { it.paidForOthers }
+        val maxAmount = monthData.maxOfOrNull { it.paidForOthers } ?: 0.0
+
+        // Calculate category breakdown for split transactions (last 6 months)
+        val sixMonthsAgo = Calendar.getInstance().apply {
+            add(Calendar.MONTH, -6)
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val splitTransactions = transactions.filter {
+            it.isSplit && !it.isPending && it.date >= sixMonthsAgo
+        }
+
+        val categoryMap = categories.associateBy { it.id }
+        val parentCategories = categories.filter { it.parentId == null }
+
+        // Group by parent category (roll up child categories to parent)
+        val categoryTotals = mutableMapOf<Long, Double>()
+        splitTransactions.forEach { txn ->
+            val category = categoryMap[txn.categoryId]
+            // If category has a parent, use parent's ID; otherwise use the category's own ID
+            val parentId = (category?.parentId ?: category?.id ?: txn.categoryId) as Long
+            val paidForOthers = txn.totalAmount - txn.amount
+            categoryTotals.merge(parentId, paidForOthers) { old, new -> old + new }
+        }
+
+        val categoryBreakdown = parentCategories.mapNotNull { parent ->
+            val amount = categoryTotals[parent.id] ?: 0.0
+            if (amount > 0) {
+                SplitCategoryItem(
+                    categoryId = parent.id,
+                    categoryName = parent.name,
+                    emoji = parent.emoji,
+                    amount = amount,
+                    percentage = if (total > 0) (amount / total * 100).toFloat() else 0f
+                )
+            } else null
+        }.sortedByDescending { it.amount }
+
+        SplitSummaryState(
+            monthlyData = monthData,
+            categoryBreakdown = categoryBreakdown,
+            totalPaidForOthers = total,
+            maxAmount = maxAmount
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SplitSummaryState()
+    )
 
     private fun getTimeRange(range: AnalyticsTimeRange): Pair<Long, Long> {
         val calendar = Calendar.getInstance()
