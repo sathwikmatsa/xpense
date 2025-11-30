@@ -139,8 +139,10 @@ class AnalyticsViewModel(
             categoryRepository.allCategories,
             transactionRepository.getTransactionsBetween(startTime, endTime)
         ) { categoryTotals, categories, transactions ->
-            val totalExpense = categoryTotals.sumOf { it.total }
-            val expenseTransactions = transactions.filter { it.type == TransactionType.EXPENSE }
+            val expenseTransactions = transactions.filter {
+                !it.isPending && it.type == TransactionType.EXPENSE
+            }
+            val totalExpense = expenseTransactions.sumOf { it.amount }
 
             val totalsMap = categoryTotals.associate { (it.categoryId ?: 0L) to it.total }
             val parentCategories = categories.filter { it.parentId == null }
@@ -230,6 +232,7 @@ class AnalyticsViewModel(
             kotlinx.coroutines.flow.flowOf(Unit)
         ) { transactions, _ ->
             val filteredTransactions = transactions.filter { txn ->
+                !txn.isPending &&
                 txn.type == TransactionType.EXPENSE &&
                 (expandedCategories.isEmpty() || txn.categoryId in expandedCategories)
             }

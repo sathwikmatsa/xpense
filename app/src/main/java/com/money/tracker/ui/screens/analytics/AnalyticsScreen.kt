@@ -154,11 +154,18 @@ private fun SpendingOverviewWidget(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Spending Overview",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Column {
+                    Text(
+                        text = "Spending Overview",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "${uiState.transactionCount} ${if (uiState.transactionCount == 1) "transaction" else "transactions"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -223,23 +230,13 @@ private fun SpendingOverviewWidget(
             }
 
             // Summary
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            Text(
+                text = currencyFormat.format(uiState.totalExpense),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp)
-            ) {
-                Text(
-                    text = currencyFormat.format(uiState.totalExpense),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "${uiState.transactionCount} transactions",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Bottom)
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 

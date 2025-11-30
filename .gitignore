@@ -22,3 +22,5 @@ app/release/
 *.log
 *.tmp
 .swp
+xpense.jks
+*.jks

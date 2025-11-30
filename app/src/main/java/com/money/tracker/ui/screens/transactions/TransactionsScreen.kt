@@ -211,7 +211,7 @@ fun TransactionsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${filteredTransactions.size} transactions",
+                            text = "${filteredTransactions.size} ${if (filteredTransactions.size == 1) "transaction" else "transactions"}",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -254,7 +254,7 @@ fun TransactionsScreen(
                             item {
                                 AssistChip(
                                     onClick = { selectedCategories = emptySet() },
-                                    label = { Text("${selectedCategories.size} categories") },
+                                    label = { Text("${selectedCategories.size} ${if (selectedCategories.size == 1) "category" else "categories"}") },
                                     trailingIcon = {
                                         Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.padding(start = 4.dp))
                                     }
