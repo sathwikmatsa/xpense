@@ -23,6 +23,7 @@ import java.util.Locale
 data class HomeUiState(
     val transactions: List<Transaction> = emptyList(),
     val pendingTransactions: List<Transaction> = emptyList(),
+    val unsyncedSplitTransactions: List<Transaction> = emptyList(),
     val upiReminders: List<UpiReminder> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
     val totalIncome: Double = 0.0,
@@ -69,7 +70,8 @@ class HomeViewModel(
         budgetRepository.getBudget(currentYearMonth),
         _showIncome,
         transactionRepository.getPendingTransactions(),
-        upiReminderRepository.allReminders
+        upiReminderRepository.allReminders,
+        transactionRepository.getUnsyncedSplitTransactions()
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val transactions = values[0] as List<Transaction>
@@ -83,10 +85,13 @@ class HomeViewModel(
         val pendingTransactions = values[6] as List<Transaction>
         @Suppress("UNCHECKED_CAST")
         val upiReminders = values[7] as List<UpiReminder>
+        @Suppress("UNCHECKED_CAST")
+        val unsyncedSplitTransactions = values[8] as List<Transaction>
 
         HomeUiState(
             transactions = transactions.filter { !it.isPending },
             pendingTransactions = pendingTransactions,
+            unsyncedSplitTransactions = unsyncedSplitTransactions,
             upiReminders = upiReminders,
             categories = categories.associateBy { it.id },
             totalIncome = income ?: 0.0,
@@ -126,6 +131,12 @@ class HomeViewModel(
     fun dismissUpiReminder(reminderId: Long) {
         viewModelScope.launch {
             upiReminderRepository.deleteById(reminderId)
+        }
+    }
+
+    fun markSplitSynced(transactionId: Long) {
+        viewModelScope.launch {
+            transactionRepository.markSplitSynced(transactionId)
         }
     }
 

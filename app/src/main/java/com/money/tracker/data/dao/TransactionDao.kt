@@ -71,6 +71,16 @@ interface TransactionDao {
 
     @Query("SELECT COUNT(*) FROM transactions WHERE isPending = 1")
     fun getPendingCount(): Flow<Int>
+
+    // Split transaction queries
+    @Query("SELECT * FROM transactions WHERE isSplit = 1 AND splitSynced = 0 ORDER BY date DESC")
+    fun getUnsyncedSplitTransactions(): Flow<List<Transaction>>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE isSplit = 1 AND splitSynced = 0")
+    fun getUnsyncedSplitCount(): Flow<Int>
+
+    @Query("UPDATE transactions SET splitSynced = 1 WHERE id = :id")
+    suspend fun markSplitSynced(id: Long)
 }
 
 data class CategoryTotal(

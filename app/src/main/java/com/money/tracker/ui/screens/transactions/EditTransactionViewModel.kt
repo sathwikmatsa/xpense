@@ -55,18 +55,34 @@ class EditTransactionViewModel(
         type: TransactionType,
         categoryId: Long,
         source: TransactionSource,
-        date: Long
+        date: Long,
+        isSplit: Boolean = false,
+        splitNumerator: Int = 1,
+        splitDenominator: Int = 1,
+        customMyShare: Double? = null
     ) {
         viewModelScope.launch {
             val existing = _uiState.value.transaction ?: return@launch
+
+            // Calculate my share for split transactions
+            val myShare = when {
+                customMyShare != null -> customMyShare
+                isSplit && splitDenominator > 0 -> amount * splitNumerator / splitDenominator
+                else -> amount
+            }
+
             val updated = existing.copy(
-                amount = amount,
+                amount = myShare,
                 description = description,
                 type = type,
                 categoryId = categoryId,
                 source = source,
                 date = date,
-                isPending = false // Mark as confirmed when saved
+                isPending = false,
+                isSplit = isSplit,
+                splitNumerator = if (customMyShare != null) 0 else splitNumerator,
+                splitDenominator = if (customMyShare != null) 0 else splitDenominator,
+                totalAmount = if (isSplit) amount else 0.0
             )
             transactionRepository.update(updated)
             _uiState.value = _uiState.value.copy(isSaved = true)

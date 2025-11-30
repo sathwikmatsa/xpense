@@ -77,4 +77,17 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     fun getPendingCount(): Flow<Int> {
         return transactionDao.getPendingCount()
     }
+
+    // Split transaction methods
+    fun getUnsyncedSplitTransactions(): Flow<List<Transaction>> {
+        return transactionDao.getUnsyncedSplitTransactions()
+    }
+
+    fun getUnsyncedSplitCount(): Flow<Int> {
+        return transactionDao.getUnsyncedSplitCount()
+    }
+
+    suspend fun markSplitSynced(id: Long) {
+        transactionDao.markSplitSynced(id)
+    }
 }

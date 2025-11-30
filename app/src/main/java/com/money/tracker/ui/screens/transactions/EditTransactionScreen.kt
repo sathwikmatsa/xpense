@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -65,15 +70,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.SplitShare
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.CategoryPickerDialog
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditTransactionScreen(
     viewModel: EditTransactionViewModel,
@@ -89,6 +96,13 @@ fun EditTransactionScreen(
     var selectedSource by remember { mutableStateOf(TransactionSource.UPI) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var initialized by remember { mutableStateOf(false) }
+
+    // Split transaction state
+    var isSplit by remember { mutableStateOf(false) }
+    var selectedSplitShare by remember { mutableStateOf(SplitShare.HALF) }
+    var customMyShare by remember { mutableStateOf("") }
+
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
     var showCategoryPicker by remember { mutableStateOf(false) }
     var sourceExpanded by remember { mutableStateOf(false) }
@@ -106,13 +120,30 @@ fun EditTransactionScreen(
     LaunchedEffect(uiState.transaction, categories) {
         if (!initialized && uiState.transaction != null) {
             val txn = uiState.transaction!!
-            amount = txn.amount.toString()
+            // For split transactions, show totalAmount; otherwise show amount
+            amount = if (txn.isSplit && txn.totalAmount > 0) {
+                txn.totalAmount.toString()
+            } else {
+                txn.amount.toString()
+            }
             description = txn.description
             selectedType = txn.type
             selectedSource = txn.source
             selectedDateTime = txn.date
             selectedCategory = txn.categoryId?.let { catId ->
                 categories.find { it.id == catId }
+            }
+            // Initialize split state
+            isSplit = txn.isSplit
+            if (txn.isSplit) {
+                val matchedShare = SplitShare.fromFraction(txn.splitNumerator, txn.splitDenominator)
+                if (matchedShare != null) {
+                    selectedSplitShare = matchedShare
+                } else {
+                    // Custom share
+                    selectedSplitShare = SplitShare.CUSTOM
+                    customMyShare = txn.amount.toString()
+                }
             }
             initialized = true
         }
@@ -265,6 +296,10 @@ fun EditTransactionScreen(
             FloatingActionButton(
                 onClick = {
                     val amountValue = amount.toDoubleOrNull()
+                    val myShareValue = if (selectedSplitShare == SplitShare.CUSTOM) {
+                        customMyShare.toDoubleOrNull()
+                    } else null
+
                     when {
                         amountValue == null -> {
                             scope.launch { snackbarHostState.showSnackbar("Please enter a valid amount") }
@@ -275,6 +310,12 @@ fun EditTransactionScreen(
                         selectedCategory == null -> {
                             scope.launch { snackbarHostState.showSnackbar("Please select a category") }
                         }
+                        isSplit && selectedSplitShare == SplitShare.CUSTOM && (myShareValue == null || myShareValue <= 0) -> {
+                            scope.launch { snackbarHostState.showSnackbar("Please enter a valid share amount") }
+                        }
+                        isSplit && selectedSplitShare == SplitShare.CUSTOM && myShareValue!! > amountValue -> {
+                            scope.launch { snackbarHostState.showSnackbar("Your share cannot exceed total amount") }
+                        }
                         else -> {
                             viewModel.updateTransaction(
                                 amount = amountValue,
@@ -282,7 +323,11 @@ fun EditTransactionScreen(
                                 type = selectedType,
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
-                                date = selectedDateTime
+                                date = selectedDateTime,
+                                isSplit = isSplit,
+                                splitNumerator = selectedSplitShare.numerator,
+                                splitDenominator = selectedSplitShare.denominator,
+                                customMyShare = myShareValue
                             )
                         }
                     }
@@ -343,12 +388,129 @@ fun EditTransactionScreen(
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Amount") },
+                    label = { Text(if (isSplit) "Total Amount Paid" else "Amount") },
                     prefix = { Text("₹ ") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
+                // Split Transaction Section (only for expenses)
+                if (selectedType == TransactionType.EXPENSE) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Split this expense?",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Switch(
+                                    checked = isSplit,
+                                    onCheckedChange = { isSplit = it }
+                                )
+                            }
+
+                            if (isSplit) {
+                                Text(
+                                    text = "Your share",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    SplitShare.entries.forEach { share ->
+                                        FilterChip(
+                                            selected = selectedSplitShare == share,
+                                            onClick = {
+                                                selectedSplitShare = share
+                                                if (share != SplitShare.CUSTOM) {
+                                                    customMyShare = ""
+                                                }
+                                            },
+                                            label = { Text(share.label) }
+                                        )
+                                    }
+                                }
+
+                                // Custom share input
+                                if (selectedSplitShare == SplitShare.CUSTOM) {
+                                    val totalAmount = amount.toDoubleOrNull() ?: 0.0
+                                    val customShareValue = customMyShare.toDoubleOrNull() ?: 0.0
+                                    val isCustomShareValid = customMyShare.isEmpty() || (customShareValue > 0 && customShareValue <= totalAmount)
+
+                                    OutlinedTextField(
+                                        value = customMyShare,
+                                        onValueChange = { customMyShare = it.filter { c -> c.isDigit() || c == '.' } },
+                                        label = { Text("My Share Amount") },
+                                        prefix = { Text("₹ ") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        isError = !isCustomShareValid,
+                                        supportingText = if (!isCustomShareValid) {
+                                            { Text("Must be between ₹1 and total amount") }
+                                        } else null
+                                    )
+                                }
+
+                                // Show calculated amounts
+                                val amountValue = amount.toDoubleOrNull() ?: 0.0
+                                val myShare = if (selectedSplitShare == SplitShare.CUSTOM) {
+                                    customMyShare.toDoubleOrNull() ?: 0.0
+                                } else {
+                                    amountValue * selectedSplitShare.numerator / selectedSplitShare.denominator
+                                }
+                                val othersShare = amountValue - myShare
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "My share:",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = currencyFormat.format(myShare),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Others' share:",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = currencyFormat.format(othersShare),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Description
                 OutlinedTextField(

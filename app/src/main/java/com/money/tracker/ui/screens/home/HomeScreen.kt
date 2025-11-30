@@ -75,9 +75,14 @@ import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.entity.UpiReminder
 import com.money.tracker.ui.components.TransactionCard
+import com.money.tracker.ui.screens.settings.getSavedSharingApp
 import com.money.tracker.ui.theme.ExpenseRed
 import com.money.tracker.ui.theme.IncomeGreen
 import com.money.tracker.ui.theme.WarningAmber
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -227,6 +232,29 @@ fun HomeScreen(
                             transaction = transaction,
                             currencyFormat = currencyFormat,
                             onDismiss = { viewModel.dismissPendingTransaction(transaction.id) },
+                            onEdit = { onTransactionClick(transaction.id) }
+                        )
+                    }
+                }
+
+                // Pending Split Updates Section
+                if (uiState.unsyncedSplitTransactions.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Pending Splits",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    items(uiState.unsyncedSplitTransactions) { transaction ->
+                        val category = uiState.categories[transaction.categoryId]
+                        UnsyncedSplitCard(
+                            transaction = transaction,
+                            categoryName = category?.name,
+                            currencyFormat = currencyFormat,
+                            onMarkSynced = { viewModel.markSplitSynced(transaction.id) },
                             onEdit = { onTransactionClick(transaction.id) }
                         )
                     }
@@ -886,6 +914,104 @@ private fun PendingTransactionCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Add", color = IncomeGreen)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnsyncedSplitCard(
+    transaction: Transaction,
+    categoryName: String?,
+    currencyFormat: NumberFormat,
+    onMarkSynced: () -> Unit,
+    onEdit: () -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+    val othersShare = transaction.totalAmount - transaction.amount
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+        ),
+        onClick = onEdit
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = transaction.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "${categoryName ?: "Uncategorized"} • ${dateFormat.format(transaction.date)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = currencyFormat.format(transaction.totalAmount),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ExpenseRed
+                    )
+                    Text(
+                        text = "Others: ${currencyFormat.format(othersShare)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onMarkSynced,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Mark Synced")
+                }
+                Button(
+                    onClick = {
+                        // Copy amount to clipboard
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Split Amount", transaction.totalAmount.toLong().toString())
+                        clipboard.setPrimaryClip(clip)
+                        // Open sharing app
+                        val savedApp = getSavedSharingApp(context)
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            setPackage(savedApp.packageName)
+                            putExtra(Intent.EXTRA_TEXT, "${transaction.description} - ${currencyFormat.format(transaction.totalAmount)}")
+                        }
+                        try {
+                            context.startActivity(shareIntent)
+                        } catch (e: Exception) {
+                            val launchIntent = context.packageManager.getLaunchIntentForPackage(savedApp.packageName)
+                            if (launchIntent != null) {
+                                context.startActivity(launchIntent)
+                            }
+                        }
+                        // Don't mark as synced - user needs to explicitly click "Mark Synced"
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Split")
                 }
             }
         }

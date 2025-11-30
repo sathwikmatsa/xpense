@@ -20,7 +20,7 @@ import androidx.room.PrimaryKey
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val amount: Double,
+    val amount: Double, // For split transactions, this is "my share"
     val type: TransactionType,
     val description: String,
     val merchant: String? = null,
@@ -30,7 +30,13 @@ data class Transaction(
     val rawMessage: String? = null, // original SMS/email for reference
     val isManual: Boolean = false,
     val isPending: Boolean = false, // true for SMS-detected transactions awaiting confirmation
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Split transaction fields
+    val isSplit: Boolean = false,
+    val splitNumerator: Int = 1, // e.g., 1 for 1/2, 2 for 2/3
+    val splitDenominator: Int = 1, // e.g., 2 for 1/2, 3 for 2/3
+    val totalAmount: Double = 0.0, // Original total paid (when split)
+    val splitSynced: Boolean = false // Whether synced to Splitwise/etc
 )
 
 enum class TransactionType {

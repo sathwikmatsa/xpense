@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
@@ -23,7 +24,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -49,6 +58,58 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.money.tracker.service.UpiMonitorService
+
+private const val PREFS_NAME = "money_tracker_prefs"
+private const val KEY_SHARING_APP_PACKAGE = "sharing_app_package"
+private const val KEY_SHARING_APP_NAME = "sharing_app_name"
+private const val DEFAULT_SHARING_APP_PACKAGE = "com.Splitwise.SplitwiseMobile"
+private const val DEFAULT_SHARING_APP_NAME = "Splitwise"
+
+data class AppInfo(
+    val name: String,
+    val packageName: String
+)
+
+// Curated list of useful sharing apps for split expenses
+private val RECOMMENDED_APPS = listOf(
+    AppInfo("Splitwise", "com.Splitwise.SplitwiseMobile"),
+    AppInfo("PhonePe", "com.phonepe.app"),
+    AppInfo("Google Pay", "com.google.android.apps.nbu.paisa.user"),
+    AppInfo("Paytm", "net.one97.paytm"),
+    AppInfo("WhatsApp", "com.whatsapp"),
+    AppInfo("Telegram", "org.telegram.messenger"),
+    AppInfo("Google Keep", "com.google.android.keep"),
+    AppInfo("Notes", "com.samsung.android.app.notes"),
+    AppInfo("OneNote", "com.microsoft.office.onenote"),
+)
+
+fun getSharingApps(context: Context): List<AppInfo> {
+    // Return only recommended apps that are installed
+    return RECOMMENDED_APPS.filter { app ->
+        try {
+            context.packageManager.getPackageInfo(app.packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+}
+
+fun getSavedSharingApp(context: Context): AppInfo {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    return AppInfo(
+        name = prefs.getString(KEY_SHARING_APP_NAME, DEFAULT_SHARING_APP_NAME) ?: DEFAULT_SHARING_APP_NAME,
+        packageName = prefs.getString(KEY_SHARING_APP_PACKAGE, DEFAULT_SHARING_APP_PACKAGE) ?: DEFAULT_SHARING_APP_PACKAGE
+    )
+}
+
+fun saveSharingApp(context: Context, app: AppInfo) {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    prefs.edit()
+        .putString(KEY_SHARING_APP_PACKAGE, app.packageName)
+        .putString(KEY_SHARING_APP_NAME, app.name)
+        .apply()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +166,11 @@ fun SettingsScreen(
     }
 
     var isUpiMonitorEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled()) }
+
+    // Sharing app preference
+    var selectedSharingApp by remember { mutableStateOf(getSavedSharingApp(context)) }
+    var showSharingAppPicker by remember { mutableStateOf(false) }
+    val availableSharingApps = remember { getSharingApps(context) }
 
     // Re-check when returning from settings
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -184,7 +250,60 @@ fun SettingsScreen(
                 onClick = onCategoriesClick
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Sharing app setting
+            SettingsItem(
+                icon = Icons.Default.Share,
+                title = "Split sharing app",
+                subtitle = selectedSharingApp.name,
+                onClick = { showSharingAppPicker = true }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }
+    }
+
+    // Sharing app picker dialog
+    if (showSharingAppPicker) {
+        AlertDialog(
+            onDismissRequest = { showSharingAppPicker = false },
+            title = { Text("Select sharing app") },
+            text = {
+                LazyColumn {
+                    items(availableSharingApps) { app ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = app.packageName == selectedSharingApp.packageName,
+                                    onClick = {
+                                        selectedSharingApp = app
+                                        saveSharingApp(context, app)
+                                        showSharingAppPicker = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            RadioButton(
+                                selected = app.packageName == selectedSharingApp.packageName,
+                                onClick = null
+                            )
+                            Text(
+                                text = app.name,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSharingAppPicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

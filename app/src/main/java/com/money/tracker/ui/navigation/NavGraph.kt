@@ -42,6 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
+import com.money.tracker.data.repository.SharingAppRepository
 import com.money.tracker.data.repository.TransactionRepository
 import com.money.tracker.data.repository.UpiReminderRepository
 import com.money.tracker.ui.screens.analytics.AnalyticsScreen
@@ -89,6 +90,7 @@ fun MoneyTrackerNavGraph(
     categoryRepository: CategoryRepository,
     budgetRepository: BudgetRepository,
     upiReminderRepository: UpiReminderRepository,
+    sharingAppRepository: SharingAppRepository,
     openAddTransaction: Boolean = false,
     onOpenUpiApp: (String) -> Unit = {}
 ) {
@@ -153,7 +155,7 @@ fun MoneyTrackerNavGraph(
 
             composable(Screen.AddTransaction.route) {
                 val viewModel: AddTransactionViewModel = viewModel(
-                    factory = AddTransactionViewModel.Factory(transactionRepository, categoryRepository)
+                    factory = AddTransactionViewModel.Factory(transactionRepository, categoryRepository, sharingAppRepository)
                 )
                 AddTransactionScreen(
                     viewModel = viewModel,

@@ -3,6 +3,8 @@ package com.money.tracker.ui.screens.transactions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,20 +31,31 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -61,15 +74,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.SplitShare
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.CategoryPickerDialog
+import com.money.tracker.ui.screens.settings.getSavedSharingApp
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddTransactionScreen(
     viewModel: AddTransactionViewModel,
@@ -85,12 +101,19 @@ fun AddTransactionScreen(
     var selectedSource by remember { mutableStateOf(TransactionSource.UPI) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
+    // Split transaction state
+    var isSplit by remember { mutableStateOf(false) }
+    var selectedSplitShare by remember { mutableStateOf(SplitShare.HALF) }
+    var customMyShare by remember { mutableStateOf("") }
+
     var showCategoryPicker by remember { mutableStateOf(false) }
     var sourceExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val scope = rememberCoroutineScope()
 
     val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
@@ -188,6 +211,26 @@ fun AddTransactionScreen(
         }
     }
 
+    // Validation function
+    fun validateAndGetAmount(): Double? {
+        val amountValue = amount.toDoubleOrNull()
+        when {
+            amountValue == null -> {
+                scope.launch { snackbarHostState.showSnackbar("Please enter a valid amount") }
+                return null
+            }
+            description.isBlank() -> {
+                scope.launch { snackbarHostState.showSnackbar("Please enter a description") }
+                return null
+            }
+            selectedCategory == null -> {
+                scope.launch { snackbarHostState.showSnackbar("Please select a category") }
+                return null
+            }
+        }
+        return amountValue
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -201,34 +244,23 @@ fun AddTransactionScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    val amountValue = amount.toDoubleOrNull()
-                    when {
-                        amountValue == null -> {
-                            scope.launch { snackbarHostState.showSnackbar("Please enter a valid amount") }
-                        }
-                        description.isBlank() -> {
-                            scope.launch { snackbarHostState.showSnackbar("Please enter a description") }
-                        }
-                        selectedCategory == null -> {
-                            scope.launch { snackbarHostState.showSnackbar("Please select a category") }
-                        }
-                        else -> {
-                            viewModel.saveTransaction(
-                                amount = amountValue,
-                                description = description,
-                                type = selectedType,
-                                categoryId = selectedCategory!!.id,
-                                source = selectedSource,
-                                date = selectedDateTime
-                            )
-                            onSaved()
-                        }
+            if (!isSplit) {
+                FloatingActionButton(
+                    onClick = {
+                        val amountValue = validateAndGetAmount() ?: return@FloatingActionButton
+                        viewModel.saveTransaction(
+                            amount = amountValue,
+                            description = description,
+                            type = selectedType,
+                            categoryId = selectedCategory!!.id,
+                            source = selectedSource,
+                            date = selectedDateTime
+                        )
+                        onSaved()
                     }
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Save")
                 }
-            ) {
-                Icon(Icons.Default.Check, contentDescription = "Save")
             }
         }
     ) { paddingValues ->
@@ -264,12 +296,129 @@ fun AddTransactionScreen(
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
-                label = { Text("Amount") },
+                label = { Text(if (isSplit) "Total Amount Paid" else "Amount") },
                 prefix = { Text("₹ ") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
+            // Split Transaction Section (only for expenses)
+            if (selectedType == TransactionType.EXPENSE) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Split this expense?",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Switch(
+                                checked = isSplit,
+                                onCheckedChange = { isSplit = it }
+                            )
+                        }
+
+                        if (isSplit) {
+                            Text(
+                                text = "Your share",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                SplitShare.entries.forEach { share ->
+                                    FilterChip(
+                                        selected = selectedSplitShare == share,
+                                        onClick = {
+                                            selectedSplitShare = share
+                                            if (share != SplitShare.CUSTOM) {
+                                                customMyShare = ""
+                                            }
+                                        },
+                                        label = { Text(share.label) }
+                                    )
+                                }
+                            }
+
+                            // Custom share input
+                            if (selectedSplitShare == SplitShare.CUSTOM) {
+                                val totalAmount = amount.toDoubleOrNull() ?: 0.0
+                                val customShareValue = customMyShare.toDoubleOrNull() ?: 0.0
+                                val isCustomShareValid = customMyShare.isEmpty() || (customShareValue > 0 && customShareValue <= totalAmount)
+
+                                OutlinedTextField(
+                                    value = customMyShare,
+                                    onValueChange = { customMyShare = it.filter { c -> c.isDigit() || c == '.' } },
+                                    label = { Text("My Share Amount") },
+                                    prefix = { Text("₹ ") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    isError = !isCustomShareValid,
+                                    supportingText = if (!isCustomShareValid) {
+                                        { Text("Must be between ₹1 and total amount") }
+                                    } else null
+                                )
+                            }
+
+                            // Show calculated amounts
+                            val amountValue = amount.toDoubleOrNull() ?: 0.0
+                            val myShare = if (selectedSplitShare == SplitShare.CUSTOM) {
+                                customMyShare.toDoubleOrNull() ?: 0.0
+                            } else {
+                                amountValue * selectedSplitShare.numerator / selectedSplitShare.denominator
+                            }
+                            val othersShare = amountValue - myShare
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "My share:",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = currencyFormat.format(myShare),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Others' share:",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = currencyFormat.format(othersShare),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             // Description
             OutlinedTextField(
@@ -395,6 +544,108 @@ fun AddTransactionScreen(
                                 sourceExpanded = false
                             }
                         )
+                    }
+                }
+            }
+
+            // Split Save Buttons (shown when split is enabled)
+            if (isSplit) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            val amountValue = validateAndGetAmount() ?: return@OutlinedButton
+                            val myShareValue = if (selectedSplitShare == SplitShare.CUSTOM) {
+                                customMyShare.toDoubleOrNull()
+                            } else null
+                            if (selectedSplitShare == SplitShare.CUSTOM) {
+                                if (myShareValue == null || myShareValue <= 0) {
+                                    scope.launch { snackbarHostState.showSnackbar("Please enter a valid share amount") }
+                                    return@OutlinedButton
+                                }
+                                if (myShareValue > amountValue) {
+                                    scope.launch { snackbarHostState.showSnackbar("Your share cannot exceed total amount") }
+                                    return@OutlinedButton
+                                }
+                            }
+                            viewModel.saveTransaction(
+                                amount = amountValue,
+                                description = description,
+                                type = selectedType,
+                                categoryId = selectedCategory!!.id,
+                                source = selectedSource,
+                                date = selectedDateTime,
+                                isSplit = true,
+                                splitNumerator = selectedSplitShare.numerator,
+                                splitDenominator = selectedSplitShare.denominator,
+                                customMyShare = myShareValue,
+                                markAsSynced = false
+                            )
+                            onSaved()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Save")
+                    }
+                    Button(
+                        onClick = {
+                            val amountValue = validateAndGetAmount() ?: return@Button
+                            val myShareValue = if (selectedSplitShare == SplitShare.CUSTOM) {
+                                customMyShare.toDoubleOrNull()
+                            } else null
+                            if (selectedSplitShare == SplitShare.CUSTOM) {
+                                if (myShareValue == null || myShareValue <= 0) {
+                                    scope.launch { snackbarHostState.showSnackbar("Please enter a valid share amount") }
+                                    return@Button
+                                }
+                                if (myShareValue > amountValue) {
+                                    scope.launch { snackbarHostState.showSnackbar("Your share cannot exceed total amount") }
+                                    return@Button
+                                }
+                            }
+                            // Save transaction as synced
+                            viewModel.saveTransaction(
+                                amount = amountValue,
+                                description = description,
+                                type = selectedType,
+                                categoryId = selectedCategory!!.id,
+                                source = selectedSource,
+                                date = selectedDateTime,
+                                isSplit = true,
+                                splitNumerator = selectedSplitShare.numerator,
+                                splitDenominator = selectedSplitShare.denominator,
+                                customMyShare = myShareValue,
+                                markAsSynced = true
+                            )
+                            // Copy amount to clipboard
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("amount", amountValue.toLong().toString()))
+                            // Open selected sharing app
+                            val savedApp = getSavedSharingApp(context)
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                setPackage(savedApp.packageName)
+                                putExtra(Intent.EXTRA_TEXT, "${description} - ${currencyFormat.format(amountValue)}")
+                            }
+                            try {
+                                context.startActivity(shareIntent)
+                            } catch (e: Exception) {
+                                // Fallback to just launching the app
+                                val launchIntent = context.packageManager.getLaunchIntentForPackage(savedApp.packageName)
+                                if (launchIntent != null) {
+                                    context.startActivity(launchIntent)
+                                } else {
+                                    android.widget.Toast.makeText(context, "${savedApp.name} not installed", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            onSaved()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Save & Share")
                     }
                 }
             }
