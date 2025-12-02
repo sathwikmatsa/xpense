@@ -42,7 +42,7 @@ class UpiMonitorService : AccessibilityService() {
         // Keywords that indicate a successful payment
         private val SUCCESS_KEYWORDS = listOf(
             "success", "successful", "completed", "paid", "sent", "done",
-            "payment of", "debited", "transferred", "rupees", "inr", "₹"
+            "payment of", "debited", "transferred"
         )
 
         // PIN patterns (masked PIN characters)
