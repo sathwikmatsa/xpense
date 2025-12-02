@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.CategoryBudget
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.UpiReminder
 import com.money.tracker.data.repository.BudgetPreallocationRepository
 import com.money.tracker.data.repository.BudgetRepository
+import com.money.tracker.data.repository.CategoryBudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TransactionRepository
 import com.money.tracker.data.repository.UpiReminderRepository
@@ -21,6 +23,12 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+
+data class CategoryBudgetWithSpending(
+    val categoryBudget: CategoryBudget,
+    val spent: Double,
+    val category: Category
+)
 
 data class HomeUiState(
     val transactions: List<Transaction> = emptyList(),
@@ -36,6 +44,8 @@ data class HomeUiState(
     val preallocatedBudget: Double = 0.0,
     val discretionaryExpense: Double = 0.0,
     val preallocatedExpense: Double = 0.0,
+    val categoryBudgets: List<CategoryBudget> = emptyList(),
+    val categoryBudgetsWithSpending: List<CategoryBudgetWithSpending> = emptyList(),
     val showIncome: Boolean = false,
     val isLoading: Boolean = true
 )
@@ -45,7 +55,8 @@ class HomeViewModel(
     private val categoryRepository: CategoryRepository,
     private val budgetRepository: BudgetRepository,
     private val upiReminderRepository: UpiReminderRepository,
-    private val budgetPreallocationRepository: BudgetPreallocationRepository
+    private val budgetPreallocationRepository: BudgetPreallocationRepository,
+    private val categoryBudgetRepository: CategoryBudgetRepository
 ) : ViewModel() {
 
     private val calendar = Calendar.getInstance()
@@ -135,6 +146,20 @@ class HomeViewModel(
         )
     }.combine(transactionRepository.getUnsyncedSplitTransactions()) { state, unsyncedSplit ->
         state.copy(unsyncedSplitTransactions = unsyncedSplit)
+    }.combine(categoryBudgetRepository.getCategoryBudgetsForMonth(currentYearMonth)) { state, categoryBudgets ->
+        // Calculate spending per category with budget
+        val categoryBudgetsWithSpending = categoryBudgets.mapNotNull { cb ->
+            val category = state.categories[cb.categoryId] ?: return@mapNotNull null
+            val spent = state.transactions
+                .filter { it.categoryId == cb.categoryId }
+                .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+                .sumOf { it.amount }
+            CategoryBudgetWithSpending(cb, spent, category)
+        }
+        state.copy(
+            categoryBudgets = categoryBudgets,
+            categoryBudgetsWithSpending = categoryBudgetsWithSpending
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -199,16 +224,33 @@ class HomeViewModel(
         return budgetPreallocationRepository.getPreallocationsForMonthSync(getPreviousYearMonth())
     }
 
+    fun setCategoryBudget(categoryId: Long, amount: Double) {
+        viewModelScope.launch {
+            categoryBudgetRepository.setCategoryBudget(currentYearMonth, categoryId, amount)
+        }
+    }
+
+    fun saveCategoryBudgets(categoryBudgets: List<CategoryBudget>) {
+        viewModelScope.launch {
+            categoryBudgetRepository.setCategoryBudgets(currentYearMonth, categoryBudgets)
+        }
+    }
+
+    suspend fun getPreviousMonthCategoryBudgets(): List<CategoryBudget> {
+        return categoryBudgetRepository.getCategoryBudgetsForMonthSync(getPreviousYearMonth())
+    }
+
     class Factory(
         private val transactionRepository: TransactionRepository,
         private val categoryRepository: CategoryRepository,
         private val budgetRepository: BudgetRepository,
         private val upiReminderRepository: UpiReminderRepository,
-        private val budgetPreallocationRepository: BudgetPreallocationRepository
+        private val budgetPreallocationRepository: BudgetPreallocationRepository,
+        private val categoryBudgetRepository: CategoryBudgetRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return HomeViewModel(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository) as T
+            return HomeViewModel(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository, categoryBudgetRepository) as T
         }
     }
 }

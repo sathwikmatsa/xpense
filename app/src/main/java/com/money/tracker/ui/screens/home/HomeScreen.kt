@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.CategoryBudget
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.entity.UpiReminder
@@ -126,13 +127,15 @@ fun HomeScreen(
         BudgetDialog(
             currentBudget = uiState.budget,
             currentPreallocations = uiState.preallocations,
+            currentCategoryBudgets = uiState.categoryBudgets,
             categories = uiState.categories,
             viewModel = viewModel,
             currentYearMonth = viewModel.getCurrentYearMonth(),
             onDismiss = { showBudgetDialog = false },
-            onSave = { amount, preallocations ->
+            onSave = { amount, preallocations, categoryBudgets ->
                 viewModel.setBudget(amount)
                 viewModel.savePreallocations(preallocations)
+                viewModel.saveCategoryBudgets(categoryBudgets)
                 showBudgetDialog = false
             },
             onClear = {
@@ -227,6 +230,28 @@ fun HomeScreen(
                     item {
                         PaidForOthersCard(
                             amount = uiState.paidForOthers,
+                            currencyFormat = currencyFormat
+                        )
+                    }
+                }
+
+                // Category Budget Cards
+                if (uiState.categoryBudgetsWithSpending.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Category Budgets",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    items(uiState.categoryBudgetsWithSpending) { item ->
+                        CategoryBudgetCard(
+                            categoryName = item.category.name,
+                            emoji = item.category.emoji,
+                            budget = item.categoryBudget.amount,
+                            spent = item.spent,
                             currencyFormat = currencyFormat
                         )
                     }
@@ -719,6 +744,87 @@ private fun PaidForOthersCard(
 }
 
 @Composable
+private fun CategoryBudgetCard(
+    categoryName: String,
+    emoji: String,
+    budget: Double,
+    spent: Double,
+    currencyFormat: NumberFormat
+) {
+    val remaining = budget - spent
+    val progress = if (budget > 0) (spent / budget).coerceIn(0.0, 1.0).toFloat() else 0f
+    val isOverBudget = spent > budget
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isOverBudget)
+                ExpenseRed.copy(alpha = 0.1f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(emoji, fontSize = 20.sp)
+                    Text(
+                        text = categoryName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Text(
+                    text = if (isOverBudget) "Over by ${currencyFormat.format(-remaining)}" else "${currencyFormat.format(remaining)} left",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isOverBudget) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = if (isOverBudget) ExpenseRed else if (progress > 0.8f) WarningAmber else IncomeGreen,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = StrokeCap.Round
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Spent: ${currencyFormat.format(spent)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Budget: ${currencyFormat.format(budget)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun InsightCard(
     modifier: Modifier = Modifier,
     icon: ImageVector,
@@ -773,16 +879,19 @@ private fun InsightCard(
 private fun BudgetDialog(
     currentBudget: Double?,
     currentPreallocations: List<BudgetPreallocation>,
+    currentCategoryBudgets: List<CategoryBudget>,
     categories: Map<Long, Category>,
     viewModel: HomeViewModel,
     currentYearMonth: String,
     onDismiss: () -> Unit,
-    onSave: (Double, List<BudgetPreallocation>) -> Unit,
+    onSave: (Double, List<BudgetPreallocation>, List<CategoryBudget>) -> Unit,
     onClear: () -> Unit
 ) {
     var budgetText by remember { mutableStateOf(currentBudget?.toLong()?.toString() ?: "") }
     val preallocations = remember { mutableStateListOf<BudgetPreallocation>().apply { addAll(currentPreallocations) } }
+    val categoryBudgets = remember { mutableStateListOf<CategoryBudget>().apply { addAll(currentCategoryBudgets) } }
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showCategoryBudgetPicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Copy from previous month if this month has no preallocations
@@ -795,14 +904,30 @@ private fun BudgetDialog(
                 }
             }
         }
+        if (categoryBudgets.isEmpty()) {
+            scope.launch {
+                val previousCategoryBudgets = viewModel.getPreviousMonthCategoryBudgets()
+                if (previousCategoryBudgets.isNotEmpty()) {
+                    categoryBudgets.addAll(previousCategoryBudgets.map { it.copy(yearMonth = currentYearMonth) })
+                }
+            }
+        }
     }
 
     val totalPreallocated = preallocations.sumOf { it.amount }
     val discretionaryBudget = (budgetText.toDoubleOrNull() ?: 0.0) - totalPreallocated
 
+    // Categories that are preallocated
+    val preallocatedCategoryIds = preallocations.map { it.categoryId }.toSet()
+
     // Categories available for preallocation (not already preallocated)
     val availableCategories = categories.values.filter { cat ->
         preallocations.none { it.categoryId == cat.id }
+    }
+
+    // Categories available for category budgets (not preallocated and not already budgeted)
+    val availableCategoriesForBudget = categories.values.filter { cat ->
+        cat.id !in preallocatedCategoryIds && categoryBudgets.none { it.categoryId == cat.id }
     }
 
     if (showCategoryPicker) {
@@ -838,6 +963,45 @@ private fun BudgetDialog(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showCategoryPicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showCategoryBudgetPicker) {
+        AlertDialog(
+            onDismissRequest = { showCategoryBudgetPicker = false },
+            title = { Text("Add Category Budget") },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(availableCategoriesForBudget.toList()) { category ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    categoryBudgets.add(CategoryBudget(currentYearMonth, category.id, 0.0))
+                                    showCategoryBudgetPicker = false
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(category.emoji, fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(category.name)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showCategoryBudgetPicker = false }) {
                     Text("Cancel")
                 }
             }
@@ -931,6 +1095,55 @@ private fun BudgetDialog(
                         }
                     }
                 }
+
+                // Category Budgets section (only for non-preallocated categories)
+                if (categoryBudgets.isNotEmpty() || availableCategoriesForBudget.isNotEmpty()) {
+                    Text(
+                        text = "Category Budgets",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    categoryBudgets.forEachIndexed { index, cb ->
+                        val category = categories[cb.categoryId]
+                        if (category != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(category.emoji, fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    category.name,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                OutlinedTextField(
+                                    value = if (cb.amount > 0) cb.amount.toLong().toString() else "",
+                                    onValueChange = { newValue ->
+                                        val amount = newValue.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
+                                        categoryBudgets[index] = cb.copy(amount = amount)
+                                    },
+                                    prefix = { Text("₹", style = MaterialTheme.typography.bodySmall) },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.width(100.dp)
+                                )
+                                IconButton(onClick = { categoryBudgets.removeAt(index) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = ExpenseRed)
+                                }
+                            }
+                        }
+                    }
+
+                    if (availableCategoriesForBudget.isNotEmpty()) {
+                        TextButton(onClick = { showCategoryBudgetPicker = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add category budget")
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -938,7 +1151,7 @@ private fun BudgetDialog(
             val isValid = budgetText.isNotBlank() && budgetAmount > 0 && budgetAmount >= totalPreallocated
             TextButton(
                 onClick = {
-                    onSave(budgetAmount, preallocations.toList())
+                    onSave(budgetAmount, preallocations.toList(), categoryBudgets.toList())
                 },
                 enabled = isValid
             ) {
