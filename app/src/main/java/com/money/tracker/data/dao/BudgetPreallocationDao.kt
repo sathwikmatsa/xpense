@@ -33,4 +33,10 @@ interface BudgetPreallocationDao {
 
     @Query("SELECT categoryId FROM budget_preallocations WHERE yearMonth = :yearMonth AND amount > 0")
     fun getPreallocatedCategoryIds(yearMonth: String): Flow<List<Long>>
+
+    @Query("SELECT * FROM budget_preallocations")
+    suspend fun getAllPreallocationsSync(): List<BudgetPreallocation>
+
+    @Query("DELETE FROM budget_preallocations")
+    suspend fun deleteAllPreallocations()
 }

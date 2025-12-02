@@ -114,6 +114,15 @@ interface TransactionDao {
         AND categoryId IN (:preallocatedCategoryIds)
     """)
     fun getPreallocatedExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?>
+
+    @Query("SELECT * FROM transactions ORDER BY date DESC")
+    suspend fun getAllTransactionsSync(): List<Transaction>
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAllTransactions()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithId(transaction: Transaction)
 }
 
 data class CategoryTotal(

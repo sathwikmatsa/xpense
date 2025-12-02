@@ -2,18 +2,22 @@ package com.money.tracker.ui.screens.settings
 
 import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
+import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
-import com.money.tracker.service.PaymentNotificationListener
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.money.tracker.util.DatabaseBackupManager
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,10 +30,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.TextButton
@@ -184,6 +190,32 @@ fun SettingsScreen(
     var showSharingAppPicker by remember { mutableStateOf(false) }
     val availableSharingApps = remember { getSharingApps(context) }
 
+    // Backup/Restore
+    val scope = rememberCoroutineScope()
+    val backupManager = remember { DatabaseBackupManager(context) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                val result = backupManager.exportToJson(it)
+                Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                val result = backupManager.importFromJson(it)
+                Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // Re-check when returning from settings
     val lifecycleOwner = LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
@@ -284,6 +316,30 @@ fun SettingsScreen(
                 title = "Split sharing app",
                 subtitle = selectedSharingApp.name,
                 onClick = { showSharingAppPicker = true }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Export data
+            SettingsItem(
+                icon = Icons.Default.Upload,
+                title = "Export data",
+                subtitle = "Backup all data to JSON file",
+                onClick = {
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    val fileName = "xpense_backup_${dateFormat.format(Date())}.json"
+                    exportLauncher.launch(fileName)
+                }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Import data
+            SettingsItem(
+                icon = Icons.Default.Download,
+                title = "Import data",
+                subtitle = "Restore from backup (replaces all data)",
+                onClick = {
+                    importLauncher.launch(arrayOf("application/json"))
+                }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         }

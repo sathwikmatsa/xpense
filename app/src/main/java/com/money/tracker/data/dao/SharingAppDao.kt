@@ -24,4 +24,13 @@ interface SharingAppDao {
 
     @Delete
     suspend fun delete(app: SharingApp)
+
+    @Query("SELECT * FROM sharing_apps ORDER BY sortOrder ASC")
+    suspend fun getAllAppsSync(): List<SharingApp>
+
+    @Query("DELETE FROM sharing_apps")
+    suspend fun deleteAllApps()
+
+    @Insert
+    suspend fun insertWithId(app: SharingApp)
 }

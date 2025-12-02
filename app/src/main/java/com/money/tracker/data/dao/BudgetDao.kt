@@ -17,4 +17,13 @@ interface BudgetDao {
 
     @Query("DELETE FROM budgets WHERE yearMonth = :yearMonth")
     suspend fun deleteBudget(yearMonth: String)
+
+    @Query("SELECT * FROM budgets")
+    suspend fun getAllBudgetsSync(): List<Budget>
+
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAllBudgets()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(budget: Budget)
 }

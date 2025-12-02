@@ -44,4 +44,13 @@ interface CategoryDao {
 
     @Query("SELECT id FROM categories WHERE parentId = :parentId")
     suspend fun getChildCategoryIds(parentId: Long): List<Long>
+
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    suspend fun getAllCategoriesSync(): List<Category>
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAllCategories()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithId(category: Category)
 }

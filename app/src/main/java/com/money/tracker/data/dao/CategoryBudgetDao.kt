@@ -30,4 +30,10 @@ interface CategoryBudgetDao {
 
     @Query("SELECT * FROM category_budgets WHERE yearMonth = :yearMonth AND categoryId = :categoryId")
     suspend fun getCategoryBudget(yearMonth: String, categoryId: Long): CategoryBudget?
+
+    @Query("SELECT * FROM category_budgets")
+    suspend fun getAllCategoryBudgetsSync(): List<CategoryBudget>
+
+    @Query("DELETE FROM category_budgets")
+    suspend fun deleteAllCategoryBudgets()
 }
