@@ -190,6 +190,7 @@ class UpiMonitorService : AccessibilityService() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("open_add_transaction", true)
                 putExtra("upi_reminder_id", reminderId)
+                putExtra("upi_package_name", packageName ?: "")
             }
 
             val pendingIntent = PendingIntent.getActivity(

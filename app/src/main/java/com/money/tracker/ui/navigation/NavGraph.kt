@@ -63,6 +63,7 @@ import com.money.tracker.ui.screens.transactions.EditTransactionViewModel
 import com.money.tracker.ui.screens.settings.SettingsScreen
 import com.money.tracker.ui.screens.settings.CategoriesScreen
 import com.money.tracker.ui.screens.settings.CategoriesViewModel
+import com.money.tracker.data.entity.TransactionSource
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
@@ -98,19 +99,22 @@ fun MoneyTrackerNavGraph(
     sharingAppRepository: SharingAppRepository,
     openAddTransaction: Boolean = false,
     upiReminderId: Long = -1L,
+    upiPackageName: String = "",
     onOpenUpiApp: (String) -> Unit = {}
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Track the UPI reminder ID if we came from notification
+    // Track the UPI reminder if we came from notification
     var currentUpiReminderId by remember { mutableStateOf(-1L) }
+    var currentUpiPackageName by remember { mutableStateOf("") }
 
     // Navigate to add transaction if requested via intent
     androidx.compose.runtime.LaunchedEffect(openAddTransaction, upiReminderId) {
         if (openAddTransaction) {
             currentUpiReminderId = upiReminderId
+            currentUpiPackageName = upiPackageName
             navController.navigate(Screen.AddTransaction.route)
         }
     }
@@ -168,13 +172,23 @@ fun MoneyTrackerNavGraph(
                 val viewModel: AddTransactionViewModel = viewModel(
                     factory = AddTransactionViewModel.Factory(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository)
                 )
+                // Map UPI package name to TransactionSource
+                val initialSource = when (currentUpiPackageName) {
+                    "com.google.android.apps.nbu.paisa.user" -> TransactionSource.GOOGLE_PAY
+                    "com.phonepe.app" -> TransactionSource.PHONEPE
+                    "com.dreamplug.androidapp" -> TransactionSource.CRED
+                    "money.jupiter" -> TransactionSource.JUPITER
+                    else -> TransactionSource.UPI
+                }
                 AddTransactionScreen(
                     viewModel = viewModel,
+                    initialSource = initialSource,
                     onNavigateBack = { navController.popBackStack() },
                     onSaved = {
                         if (currentUpiReminderId > 0) {
                             viewModel.deleteUpiReminder(currentUpiReminderId)
                             currentUpiReminderId = -1L
+                            currentUpiPackageName = ""
                         }
                         navController.popBackStack()
                     }

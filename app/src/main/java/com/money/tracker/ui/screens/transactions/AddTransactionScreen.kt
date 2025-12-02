@@ -90,6 +90,7 @@ import java.util.Locale
 @Composable
 fun AddTransactionScreen(
     viewModel: AddTransactionViewModel,
+    initialSource: TransactionSource = TransactionSource.UPI,
     onNavigateBack: () -> Unit,
     onSaved: () -> Unit
 ) {
@@ -100,7 +101,7 @@ fun AddTransactionScreen(
     var description by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    var selectedSource by remember { mutableStateOf(TransactionSource.UPI) }
+    var selectedSource by remember { mutableStateOf(initialSource) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     // Split transaction state
