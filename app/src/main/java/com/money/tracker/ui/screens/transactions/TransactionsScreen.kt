@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.TransactionCard
 import java.text.NumberFormat
@@ -89,6 +90,7 @@ fun TransactionsScreen(
     var timeRangeFilter by remember { mutableStateOf(TimeRangeFilter.YEAR) }
     var splitFilter by remember { mutableStateOf(SplitFilter.ALL) }
     var selectedCategories by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var selectedTags by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showFilterSheet by remember { mutableStateOf(false) }
     var customStartDate by remember { mutableStateOf<Long?>(null) }
     var customEndDate by remember { mutableStateOf<Long?>(null) }
@@ -162,13 +164,14 @@ fun TransactionsScreen(
         }
         val matchesTime = txn.date >= startTime && txn.date <= endTime
         val matchesCategory = expandedCategories.isEmpty() || txn.categoryId in expandedCategories
+        val matchesTag = selectedTags.isEmpty() || txn.tagId in selectedTags
         val matchesSplit = when (splitFilter) {
             SplitFilter.ALL -> true
             SplitFilter.SPLIT_ONLY -> txn.isSplit
             SplitFilter.NON_SPLIT -> !txn.isSplit
         }
 
-        matchesType && matchesTime && matchesCategory && matchesSplit
+        matchesType && matchesTime && matchesCategory && matchesTag && matchesSplit
     }
 
     // Group transactions by date
@@ -181,6 +184,7 @@ fun TransactionsScreen(
         if (typeFilter != TransactionTypeFilter.ALL) typeFilter else null,
         if (timeRangeFilter != TimeRangeFilter.YEAR) timeRangeFilter else null,
         if (selectedCategories.isNotEmpty()) "categories" else null,
+        if (selectedTags.isNotEmpty()) "tags" else null,
         if (splitFilter != SplitFilter.ALL) splitFilter else null
     ).size
 
@@ -198,6 +202,7 @@ fun TransactionsScreen(
         ) {
             FilterBottomSheet(
                 categories = uiState.categories.values.toList(),
+                tags = uiState.tags.values.toList(),
                 typeFilter = typeFilter,
                 onTypeFilterChange = { typeFilter = it },
                 timeRangeFilter = timeRangeFilter,
@@ -214,12 +219,21 @@ fun TransactionsScreen(
                         selectedCategories + categoryId
                     }
                 },
+                selectedTags = selectedTags,
+                onTagToggle = { tagId ->
+                    selectedTags = if (tagId in selectedTags) {
+                        selectedTags - tagId
+                    } else {
+                        selectedTags + tagId
+                    }
+                },
                 splitFilter = splitFilter,
                 onSplitFilterChange = { splitFilter = it },
                 onClearFilters = {
                     typeFilter = TransactionTypeFilter.ALL
                     timeRangeFilter = TimeRangeFilter.YEAR
                     selectedCategories = emptySet()
+                    selectedTags = emptySet()
                     splitFilter = SplitFilter.ALL
                     customStartDate = null
                     customEndDate = null
@@ -329,6 +343,17 @@ fun TransactionsScreen(
                                 )
                             }
                         }
+                        if (selectedTags.isNotEmpty()) {
+                            item {
+                                AssistChip(
+                                    onClick = { selectedTags = emptySet() },
+                                    label = { Text("${selectedTags.size} ${if (selectedTags.size == 1) "tag" else "tags"}") },
+                                    trailingIcon = {
+                                        Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.padding(start = 4.dp))
+                                    }
+                                )
+                            }
+                        }
                         if (splitFilter != SplitFilter.ALL) {
                             item {
                                 AssistChip(
@@ -396,6 +421,7 @@ fun TransactionsScreen(
 @Composable
 private fun FilterBottomSheet(
     categories: List<Category>,
+    tags: List<Tag>,
     typeFilter: TransactionTypeFilter,
     onTypeFilterChange: (TransactionTypeFilter) -> Unit,
     timeRangeFilter: TimeRangeFilter,
@@ -406,6 +432,8 @@ private fun FilterBottomSheet(
     onCustomEndDateChange: (Long?) -> Unit,
     selectedCategories: Set<Long>,
     onCategoryToggle: (Long) -> Unit,
+    selectedTags: Set<Long>,
+    onTagToggle: (Long) -> Unit,
     splitFilter: SplitFilter,
     onSplitFilterChange: (SplitFilter) -> Unit,
     onClearFilters: () -> Unit
@@ -612,6 +640,26 @@ private fun FilterBottomSheet(
                     onClick = { onCategoryToggle(category.id) },
                     label = { Text(category.name) }
                 )
+            }
+        }
+
+        // Tags (Events)
+        if (tags.isNotEmpty()) {
+            Text(
+                text = "Tags",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(tags) { tag ->
+                    FilterChip(
+                        selected = tag.id in selectedTags,
+                        onClick = { onTagToggle(tag.id) },
+                        label = { Text("${tag.emoji} ${tag.name}") }
+                    )
+                }
             }
         }
 

@@ -163,7 +163,7 @@ fun MoneyTrackerNavGraph(
 
             composable(Screen.Transactions.route) {
                 val viewModel: TransactionsViewModel = viewModel(
-                    factory = TransactionsViewModel.Factory(transactionRepository, categoryRepository)
+                    factory = TransactionsViewModel.Factory(transactionRepository, categoryRepository, tagRepository)
                 )
                 TransactionsScreen(
                     viewModel = viewModel,
