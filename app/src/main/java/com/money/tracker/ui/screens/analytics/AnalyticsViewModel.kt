@@ -61,6 +61,7 @@ data class AnalyticsUiState(
     val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
     val selectedTagId: Long? = null,
+    val excludedCategories: Set<Long> = emptySet(),
     val isLoading: Boolean = true
 )
 
@@ -113,6 +114,7 @@ class AnalyticsViewModel(
 
     private val _selectedTimeRange = MutableStateFlow(AnalyticsTimeRange.MONTH)
     private val _selectedTagId = MutableStateFlow<Long?>(null)
+    private val _excludedCategories = MutableStateFlow<Set<Long>>(emptySet())
     private val _trendTimeRange = MutableStateFlow(TrendTimeRange.WEEK)
     private val _selectedTrendCategories = MutableStateFlow<Set<Long>>(emptySet())
     private val _selectedTrendTagId = MutableStateFlow<Long?>(null)
@@ -263,10 +265,11 @@ class AnalyticsViewModel(
 
     val uiState: StateFlow<AnalyticsUiState> = combine(
         _selectedTimeRange,
-        _selectedTagId
-    ) { timeRange, tagId ->
-        Pair(timeRange, tagId)
-    }.flatMapLatest { (timeRange, selectedTagId) ->
+        _selectedTagId,
+        _excludedCategories
+    ) { timeRange, tagId, excludedCategories ->
+        Triple(timeRange, tagId, excludedCategories)
+    }.flatMapLatest { (timeRange, selectedTagId, excludedCategories) ->
         val (startTime, endTime) = getTimeRange(timeRange)
         combine(
             transactionRepository.getCategoryTotals(TransactionType.EXPENSE, startTime, endTime),
@@ -274,11 +277,22 @@ class AnalyticsViewModel(
             transactionRepository.getTransactionsBetween(startTime, endTime),
             tagRepository.allTags
         ) { categoryTotals, categories, transactions, tags ->
-            // Filter by tag if selected
-            val filteredTransactions = if (selectedTagId != null) {
-                transactions.filter { it.tagId == selectedTagId }
+            // Build expanded excluded categories (include children of excluded parents)
+            val expandedExcluded = if (excludedCategories.isEmpty()) {
+                emptySet()
             } else {
-                transactions
+                val expanded = excludedCategories.toMutableSet()
+                excludedCategories.forEach { excludedId ->
+                    categories.filter { it.parentId == excludedId }
+                        .forEach { child -> expanded.add(child.id) }
+                }
+                expanded
+            }
+
+            // Filter by tag if selected, and exclude categories
+            val filteredTransactions = transactions.filter { txn ->
+                (selectedTagId == null || txn.tagId == selectedTagId) &&
+                (expandedExcluded.isEmpty() || txn.categoryId !in expandedExcluded)
             }
 
             val expenseTransactions = filteredTransactions.filter {
@@ -286,14 +300,14 @@ class AnalyticsViewModel(
             }
             val totalExpense = expenseTransactions.sumOf { it.amount }
 
-            // Calculate category totals from filtered transactions (not using the pre-calculated totals when tag filter is applied)
-            val totalsMap = if (selectedTagId != null) {
+            // Calculate category totals from filtered transactions
+            val totalsMap = if (selectedTagId != null || excludedCategories.isNotEmpty()) {
                 expenseTransactions.groupBy { it.categoryId ?: 0L }
                     .mapValues { it.value.sumOf { txn -> txn.amount } }
             } else {
                 categoryTotals.associate { (it.categoryId ?: 0L) to it.total }
             }
-            val parentCategories = categories.filter { it.parentId == null }
+            val parentCategories = categories.filter { it.parentId == null && it.id !in excludedCategories }
 
             val breakdown = parentCategories.mapNotNull { parent ->
                 val childCategories = categories.filter { it.parentId == parent.id }
@@ -348,6 +362,7 @@ class AnalyticsViewModel(
                 categories = categories,
                 tags = tags,
                 selectedTagId = selectedTagId,
+                excludedCategories = excludedCategories,
                 isLoading = false
             )
         }
@@ -593,6 +608,19 @@ class AnalyticsViewModel(
 
     fun setTagFilter(tagId: Long?) {
         _selectedTagId.value = tagId
+    }
+
+    fun toggleExcludedCategory(categoryId: Long) {
+        val current = _excludedCategories.value
+        _excludedCategories.value = if (categoryId in current) {
+            current - categoryId
+        } else {
+            current + categoryId
+        }
+    }
+
+    fun clearExcludedCategories() {
+        _excludedCategories.value = emptySet()
     }
 
     fun setTrendTimeRange(range: TrendTimeRange) {

@@ -109,7 +109,9 @@ fun AnalyticsScreen(
                     showPieChart = showPieChart,
                     onToggleView = { showPieChart = !showPieChart },
                     onTimeRangeChange = { viewModel.setTimeRange(it) },
-                    onTagChange = { viewModel.setTagFilter(it) }
+                    onTagChange = { viewModel.setTagFilter(it) },
+                    onCategoryExclude = { viewModel.toggleExcludedCategory(it) },
+                    onClearExcluded = { viewModel.clearExcludedCategories() }
                 )
             }
 
@@ -150,11 +152,16 @@ private fun SpendingOverviewWidget(
     showPieChart: Boolean,
     onToggleView: () -> Unit,
     onTimeRangeChange: (AnalyticsTimeRange) -> Unit,
-    onTagChange: (Long?) -> Unit
+    onTagChange: (Long?) -> Unit,
+    onCategoryExclude: (Long) -> Unit,
+    onClearExcluded: () -> Unit
 ) {
     var showTimeRangeDropdown by remember { mutableStateOf(false) }
     var showTagDropdown by remember { mutableStateOf(false) }
+    var showExcludeDialog by remember { mutableStateOf(false) }
     val selectedTag = uiState.tags.find { it.id == uiState.selectedTagId }
+    val parentCategories = uiState.categories.filter { it.parentId == null }
+    val categoryMap = uiState.categories.associateBy { it.id }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -339,6 +346,79 @@ private fun SpendingOverviewWidget(
                         }
                     }
                 }
+            }
+
+            // Exclude categories filter
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    Surface(
+                        modifier = Modifier
+                            .clickable { showExcludeDialog = true }
+                            .border(
+                                width = 1.dp,
+                                color = if (uiState.excludedCategories.isNotEmpty()) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp)
+                            ),
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (uiState.excludedCategories.isNotEmpty()) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = when {
+                                    uiState.excludedCategories.isEmpty() -> "Exclude categories"
+                                    uiState.excludedCategories.size == 1 -> "1 excluded"
+                                    else -> "${uiState.excludedCategories.size} excluded"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (uiState.excludedCategories.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Exclude categories",
+                                modifier = Modifier.size(18.dp),
+                                tint = if (uiState.excludedCategories.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                if (uiState.excludedCategories.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        modifier = Modifier.clickable { onClearExcluded() },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Clear exclusions",
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Exclude categories dialog
+            if (showExcludeDialog) {
+                ExcludeCategoryDialog(
+                    parentCategories = parentCategories,
+                    allCategories = uiState.categories,
+                    categoryMap = categoryMap,
+                    excludedCategories = uiState.excludedCategories,
+                    onCategoryToggle = onCategoryExclude,
+                    onClearAll = onClearExcluded,
+                    onDismiss = { showExcludeDialog = false }
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -742,6 +822,178 @@ private fun CategorySelectionDialog(
                                         modifier = Modifier.size(20.dp),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDismiss() },
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        text = "Done",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExcludeCategoryDialog(
+    parentCategories: List<com.money.tracker.data.entity.Category>,
+    allCategories: List<com.money.tracker.data.entity.Category>,
+    categoryMap: Map<Long, com.money.tracker.data.entity.Category>,
+    excludedCategories: Set<Long>,
+    onCategoryToggle: (Long) -> Unit,
+    onClearAll: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Exclude Categories",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (excludedCategories.isNotEmpty()) {
+                        Text(
+                            text = "Clear all",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { onClearAll() }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Select categories to exclude from spending overview",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 350.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    parentCategories.forEach { parent ->
+                        val isParentExcluded = parent.id in excludedCategories
+                        val childCategories = allCategories.filter { it.parentId == parent.id }
+
+                        // Parent category
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onCategoryToggle(parent.id) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isParentExcluded) {
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = parent.emoji)
+                                    Text(
+                                        text = parent.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                if (isParentExcluded) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Excluded",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+
+                        // Child categories (indented)
+                        childCategories.forEach { child ->
+                            val isChildExcluded = child.id in excludedCategories
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 24.dp)
+                                    .clickable { onCategoryToggle(child.id) },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isChildExcluded) {
+                                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = child.emoji,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            text = child.name,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    if (isChildExcluded) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Excluded",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                 }
                             }
                         }
