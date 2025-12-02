@@ -34,8 +34,17 @@ object SmsParser {
     )
 
     private val creditKeywords = listOf(
-        "credited", "credit", "received", "refund", "cashback",
+        "credited", "received", "refund", "cashback",
         "deposit", "transfer from", "added"
+    )
+
+    // Keywords that indicate this is NOT a transaction (bill reminders, OTPs, promos, etc.)
+    private val excludeKeywords = listOf(
+        "amt due", "amount due", "due date", "bill due", "pay now", "pay by",
+        "minimum due", "min due", "total due", "outstanding", "overdue",
+        "reminder", "otp is", "otp:", "one time password", "verification code",
+        "offer", "cashback offer", "reward", "win", "earn", "avail",
+        "emi available", "convert to emi", "pre-approved", "limit increased"
     )
 
     private val upiPatterns = listOf(
@@ -58,6 +67,11 @@ object SmsParser {
 
     fun parse(smsBody: String, sender: String): ParsedTransaction? {
         val lowerBody = smsBody.lowercase()
+
+        // First check if this should be excluded (bill reminders, OTPs, promos)
+        if (excludeKeywords.any { lowerBody.contains(it) }) {
+            return null // Not a transaction - it's a reminder/promo/OTP
+        }
 
         // Check if this is a transaction SMS
         val isDebit = debitKeywords.any { lowerBody.contains(it) }
