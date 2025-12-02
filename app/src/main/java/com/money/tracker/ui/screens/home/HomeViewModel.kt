@@ -3,9 +3,11 @@ package com.money.tracker.ui.screens.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.UpiReminder
+import com.money.tracker.data.repository.BudgetPreallocationRepository
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TransactionRepository
@@ -30,6 +32,10 @@ data class HomeUiState(
     val totalExpense: Double = 0.0,
     val paidForOthers: Double = 0.0,
     val budget: Double? = null,
+    val preallocations: List<BudgetPreallocation> = emptyList(),
+    val preallocatedBudget: Double = 0.0,
+    val discretionaryExpense: Double = 0.0,
+    val preallocatedExpense: Double = 0.0,
     val showIncome: Boolean = false,
     val isLoading: Boolean = true
 )
@@ -38,7 +44,8 @@ class HomeViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository,
     private val budgetRepository: BudgetRepository,
-    private val upiReminderRepository: UpiReminderRepository
+    private val upiReminderRepository: UpiReminderRepository,
+    private val budgetPreallocationRepository: BudgetPreallocationRepository
 ) : ViewModel() {
 
     private val calendar = Calendar.getInstance()
@@ -72,7 +79,7 @@ class HomeViewModel(
         _showIncome,
         transactionRepository.getPendingTransactions(),
         upiReminderRepository.allReminders,
-        transactionRepository.getUnsyncedSplitTransactions()
+        budgetPreallocationRepository.getPreallocationsForMonth(currentYearMonth)
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val transactions = values[0] as List<Transaction>
@@ -87,26 +94,47 @@ class HomeViewModel(
         @Suppress("UNCHECKED_CAST")
         val upiReminders = values[7] as List<UpiReminder>
         @Suppress("UNCHECKED_CAST")
-        val unsyncedSplitTransactions = values[8] as List<Transaction>
+        val preallocations = values[8] as List<BudgetPreallocation>
 
         // Calculate paid for others from split transactions
         val paidForOthers = transactions
             .filter { it.isSplit && !it.isPending }
             .sumOf { it.totalAmount - it.amount }
 
+        // Calculate preallocated budget total from monthly preallocations
+        val preallocatedBudget = preallocations.sumOf { it.amount }
+        val preallocatedCategoryIds = preallocations.map { it.categoryId }.toSet()
+
+        // Calculate discretionary vs preallocated expenses from transactions
+        val confirmedTransactions = transactions.filter { !it.isPending }
+        val discretionaryExpense = confirmedTransactions
+            .filter { it.categoryId == null || it.categoryId !in preallocatedCategoryIds }
+            .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+            .sumOf { it.amount }
+        val preallocatedExpense = confirmedTransactions
+            .filter { it.categoryId != null && it.categoryId in preallocatedCategoryIds }
+            .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+            .sumOf { it.amount }
+
         HomeUiState(
-            transactions = transactions.filter { !it.isPending },
+            transactions = confirmedTransactions,
             pendingTransactions = pendingTransactions,
-            unsyncedSplitTransactions = unsyncedSplitTransactions,
+            unsyncedSplitTransactions = emptyList(), // Will be populated separately
             upiReminders = upiReminders,
             categories = categories.associateBy { it.id },
             totalIncome = income ?: 0.0,
             totalExpense = expense ?: 0.0,
             paidForOthers = paidForOthers,
             budget = budget?.amount,
+            preallocations = preallocations,
+            preallocatedBudget = preallocatedBudget,
+            discretionaryExpense = discretionaryExpense,
+            preallocatedExpense = preallocatedExpense,
             showIncome = showIncome,
             isLoading = false
         )
+    }.combine(transactionRepository.getUnsyncedSplitTransactions()) { state, unsyncedSplit ->
+        state.copy(unsyncedSplitTransactions = unsyncedSplit)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -147,15 +175,40 @@ class HomeViewModel(
         }
     }
 
+    fun setPreallocation(categoryId: Long, amount: Double) {
+        viewModelScope.launch {
+            budgetPreallocationRepository.setPreallocation(currentYearMonth, categoryId, amount)
+        }
+    }
+
+    fun savePreallocations(preallocations: List<BudgetPreallocation>) {
+        viewModelScope.launch {
+            budgetPreallocationRepository.setPreallocations(currentYearMonth, preallocations)
+        }
+    }
+
+    fun getCurrentYearMonth(): String = currentYearMonth
+
+    fun getPreviousYearMonth(): String {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.MONTH, -1)
+        return SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
+    }
+
+    suspend fun getPreviousMonthPreallocations(): List<BudgetPreallocation> {
+        return budgetPreallocationRepository.getPreallocationsForMonthSync(getPreviousYearMonth())
+    }
+
     class Factory(
         private val transactionRepository: TransactionRepository,
         private val categoryRepository: CategoryRepository,
         private val budgetRepository: BudgetRepository,
-        private val upiReminderRepository: UpiReminderRepository
+        private val upiReminderRepository: UpiReminderRepository,
+        private val budgetPreallocationRepository: BudgetPreallocationRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return HomeViewModel(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository) as T
+            return HomeViewModel(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository) as T
         }
     }
 }

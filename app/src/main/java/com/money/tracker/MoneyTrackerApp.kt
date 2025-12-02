@@ -2,6 +2,7 @@ package com.money.tracker
 
 import android.app.Application
 import com.money.tracker.data.AppDatabase
+import com.money.tracker.data.repository.BudgetPreallocationRepository
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.SharingAppRepository
@@ -17,6 +18,7 @@ class MoneyTrackerApp : Application() {
     val budgetRepository by lazy { BudgetRepository(database.budgetDao()) }
     val upiReminderRepository by lazy { UpiReminderRepository(database.upiReminderDao()) }
     val sharingAppRepository by lazy { SharingAppRepository(database.sharingAppDao()) }
+    val budgetPreallocationRepository by lazy { BudgetPreallocationRepository(database.budgetPreallocationDao()) }
 
     override fun onCreate() {
         super.onCreate()

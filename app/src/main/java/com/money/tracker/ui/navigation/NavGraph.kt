@@ -45,6 +45,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.money.tracker.data.repository.BudgetPreallocationRepository
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.SharingAppRepository
@@ -97,6 +98,7 @@ fun MoneyTrackerNavGraph(
     budgetRepository: BudgetRepository,
     upiReminderRepository: UpiReminderRepository,
     sharingAppRepository: SharingAppRepository,
+    budgetPreallocationRepository: BudgetPreallocationRepository,
     openAddTransaction: Boolean = false,
     upiReminderId: Long = -1L,
     upiPackageName: String = "",
@@ -136,7 +138,7 @@ fun MoneyTrackerNavGraph(
             ) {
             composable(Screen.Home.route) {
                 val viewModel: HomeViewModel = viewModel(
-                    factory = HomeViewModel.Factory(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository)
+                    factory = HomeViewModel.Factory(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository)
                 )
                 HomeScreen(
                     viewModel = viewModel,

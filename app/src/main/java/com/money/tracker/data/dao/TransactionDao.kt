@@ -98,6 +98,22 @@ interface TransactionDao {
         AND ABS(amount - :amount) < 0.01
     """)
     suspend fun hasRecentPendingTransaction(since: Long, amount: Double): Int
+
+    // Get expenses excluding preallocated categories (for discretionary budget tracking)
+    @Query("""
+        SELECT SUM(amount) FROM transactions
+        WHERE type = 'EXPENSE' AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        AND (categoryId IS NULL OR categoryId NOT IN (:preallocatedCategoryIds))
+    """)
+    fun getDiscretionaryExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?>
+
+    // Get expenses in preallocated categories
+    @Query("""
+        SELECT SUM(amount) FROM transactions
+        WHERE type = 'EXPENSE' AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        AND categoryId IN (:preallocatedCategoryIds)
+    """)
+    fun getPreallocatedExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?>
 }
 
 data class CategoryTotal(

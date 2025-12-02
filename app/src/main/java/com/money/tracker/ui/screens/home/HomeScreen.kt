@@ -50,11 +50,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +78,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.money.tracker.data.entity.BudgetPreallocation
+import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.entity.UpiReminder
@@ -116,9 +125,14 @@ fun HomeScreen(
     if (showBudgetDialog) {
         BudgetDialog(
             currentBudget = uiState.budget,
+            currentPreallocations = uiState.preallocations,
+            categories = uiState.categories,
+            viewModel = viewModel,
+            currentYearMonth = viewModel.getCurrentYearMonth(),
             onDismiss = { showBudgetDialog = false },
-            onSave = { amount ->
+            onSave = { amount, preallocations ->
                 viewModel.setBudget(amount)
+                viewModel.savePreallocations(preallocations)
                 showBudgetDialog = false
             },
             onClear = {
@@ -173,6 +187,9 @@ fun HomeScreen(
                         budget = uiState.budget,
                         totalExpense = uiState.totalExpense,
                         totalIncome = uiState.totalIncome,
+                        preallocatedBudget = uiState.preallocatedBudget,
+                        discretionaryExpense = uiState.discretionaryExpense,
+                        preallocatedExpense = uiState.preallocatedExpense,
                         showIncome = uiState.showIncome,
                         currentMonth = currentMonth,
                         daysRemaining = daysRemaining,
@@ -187,14 +204,20 @@ fun HomeScreen(
                 // Budget Insights (only when budget is set)
                 if (uiState.budget != null) {
                     item {
+                        // Use discretionary values when preallocations exist
+                        val hasPreallocated = uiState.preallocatedBudget > 0
+                        val trackingBudget = if (hasPreallocated) uiState.budget!! - uiState.preallocatedBudget else uiState.budget!!
+                        val trackingExpense = if (hasPreallocated) uiState.discretionaryExpense else uiState.totalExpense
+
                         BudgetInsights(
-                            budget = uiState.budget!!,
-                            totalExpense = uiState.totalExpense,
+                            budget = trackingBudget,
+                            totalExpense = trackingExpense,
                             paidForOthers = uiState.paidForOthers,
                             daysRemaining = daysRemaining,
                             daysPassed = daysPassed,
                             daysInMonth = daysInMonth,
-                            currencyFormat = currencyFormat
+                            currencyFormat = currencyFormat,
+                            isDiscretionary = hasPreallocated
                         )
                     }
                 }
@@ -322,6 +345,9 @@ private fun BudgetCard(
     budget: Double?,
     totalExpense: Double,
     totalIncome: Double,
+    preallocatedBudget: Double,
+    discretionaryExpense: Double,
+    preallocatedExpense: Double,
     showIncome: Boolean,
     currentMonth: String,
     daysRemaining: Int,
@@ -331,8 +357,16 @@ private fun BudgetCard(
     onToggleVisibility: () -> Unit,
     onEditBudget: () -> Unit
 ) {
-    val remaining = if (budget != null) budget - totalExpense else null
-    val progress = if (budget != null && budget > 0) (totalExpense / budget).toFloat().coerceIn(0f, 1f) else 0f
+    // Calculate discretionary budget (total budget - preallocated)
+    val hasPreallocated = preallocatedBudget > 0
+    val discretionaryBudget = if (budget != null && hasPreallocated) budget - preallocatedBudget else budget
+
+    // Use discretionary values for budget tracking when preallocated exists
+    val trackingExpense = if (hasPreallocated) discretionaryExpense else totalExpense
+    val trackingBudget = discretionaryBudget
+
+    val remaining = if (trackingBudget != null) trackingBudget - trackingExpense else null
+    val progress = if (trackingBudget != null && trackingBudget > 0) (trackingExpense / trackingBudget).toFloat().coerceIn(0f, 1f) else 0f
     val isOverBudget = remaining != null && remaining < 0
 
     // Animated progress
@@ -386,7 +420,7 @@ private fun BudgetCard(
                         )
                         Text(
                             text = if (budget != null) {
-                                if (isOverBudget) "Over budget by" else "Remaining budget"
+                                if (isOverBudget) "Over budget by" else if (hasPreallocated) "Discretionary remaining" else "Remaining budget"
                             } else {
                                 "Spent this month"
                             },
@@ -454,14 +488,24 @@ private fun BudgetCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${currencyFormat.format(totalExpense)} spent",
+                            text = if (hasPreallocated) "${currencyFormat.format(trackingExpense)} discretionary" else "${currencyFormat.format(totalExpense)} spent",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.75f)
                         )
                         Text(
-                            text = "of ${currencyFormat.format(budget)}",
+                            text = if (hasPreallocated) "of ${currencyFormat.format(trackingBudget)}" else "of ${currencyFormat.format(budget)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.75f)
+                        )
+                    }
+
+                    // Show total spent including preallocated when there are preallocations
+                    if (hasPreallocated) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Total spent: ${currencyFormat.format(totalExpense)} (incl. ${currencyFormat.format(preallocatedExpense)} preallocated)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -577,7 +621,8 @@ private fun BudgetInsights(
     daysRemaining: Int,
     daysPassed: Int,
     daysInMonth: Int,
-    currencyFormat: NumberFormat
+    currencyFormat: NumberFormat,
+    isDiscretionary: Boolean = false
 ) {
     val remaining = budget - totalExpense
     val dailyAllowance = if (daysRemaining > 0 && remaining > 0) remaining / daysRemaining else 0.0
@@ -591,6 +636,8 @@ private fun BudgetInsights(
         else -> "Over" to ExpenseRed
     }
 
+    val budgetLabel = if (isDiscretionary) "Daily Discretionary" else "Daily Budget"
+
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -602,7 +649,7 @@ private fun BudgetInsights(
             InsightCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Wallet,
-                title = "Daily Budget",
+                title = budgetLabel,
                 value = currencyFormat.format(dailyAllowance),
                 subtitle = "$daysRemaining days left",
                 accentColor = if (remaining > 0) IncomeGreen else ExpenseRed
@@ -725,41 +772,175 @@ private fun InsightCard(
 @Composable
 private fun BudgetDialog(
     currentBudget: Double?,
+    currentPreallocations: List<BudgetPreallocation>,
+    categories: Map<Long, Category>,
+    viewModel: HomeViewModel,
+    currentYearMonth: String,
     onDismiss: () -> Unit,
-    onSave: (Double) -> Unit,
+    onSave: (Double, List<BudgetPreallocation>) -> Unit,
     onClear: () -> Unit
 ) {
     var budgetText by remember { mutableStateOf(currentBudget?.toLong()?.toString() ?: "") }
+    val preallocations = remember { mutableStateListOf<BudgetPreallocation>().apply { addAll(currentPreallocations) } }
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // Copy from previous month if this month has no preallocations
+    LaunchedEffect(Unit) {
+        if (preallocations.isEmpty()) {
+            scope.launch {
+                val previousPreallocations = viewModel.getPreviousMonthPreallocations()
+                if (previousPreallocations.isNotEmpty()) {
+                    preallocations.addAll(previousPreallocations.map { it.copy(yearMonth = currentYearMonth) })
+                }
+            }
+        }
+    }
+
+    val totalPreallocated = preallocations.sumOf { it.amount }
+    val discretionaryBudget = (budgetText.toDoubleOrNull() ?: 0.0) - totalPreallocated
+
+    // Categories available for preallocation (not already preallocated)
+    val availableCategories = categories.values.filter { cat ->
+        preallocations.none { it.categoryId == cat.id }
+    }
+
+    if (showCategoryPicker) {
+        AlertDialog(
+            onDismissRequest = { showCategoryPicker = false },
+            title = { Text("Add Preallocation") },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(availableCategories.toList()) { category ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    preallocations.add(BudgetPreallocation(currentYearMonth, category.id, 0.0))
+                                    showCategoryPicker = false
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(category.emoji, fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(category.name)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showCategoryPicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Set Monthly Budget") },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "Set a budget to track your spending and get insights",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Show discretionary at top if there are preallocations
+                if (totalPreallocated > 0) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Discretionary Budget", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "₹${discretionaryBudget.toLong()}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (discretionaryBudget < 0) ExpenseRed else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = budgetText,
                     onValueChange = { budgetText = it.filter { c -> c.isDigit() } },
-                    label = { Text("Budget Amount") },
+                    label = { Text("Total Budget") },
                     prefix = { Text("₹") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                if (preallocations.isNotEmpty() || availableCategories.isNotEmpty()) {
+                    Text(
+                        text = "Pre-allocations (₹${totalPreallocated.toLong()})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    preallocations.forEachIndexed { index, preallocation ->
+                        val category = categories[preallocation.categoryId]
+                        if (category != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(category.emoji, fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    category.name,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                OutlinedTextField(
+                                    value = if (preallocation.amount > 0) preallocation.amount.toLong().toString() else "",
+                                    onValueChange = { newValue ->
+                                        val amount = newValue.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
+                                        preallocations[index] = preallocation.copy(amount = amount)
+                                    },
+                                    prefix = { Text("₹", style = MaterialTheme.typography.bodySmall) },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.width(100.dp)
+                                )
+                                IconButton(onClick = { preallocations.removeAt(index) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = ExpenseRed)
+                                }
+                            }
+                        }
+                    }
+
+                    if (availableCategories.isNotEmpty()) {
+                        TextButton(onClick = { showCategoryPicker = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add category")
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
+            val budgetAmount = budgetText.toDoubleOrNull() ?: 0.0
+            val isValid = budgetText.isNotBlank() && budgetAmount > 0 && budgetAmount >= totalPreallocated
             TextButton(
                 onClick = {
-                    budgetText.toDoubleOrNull()?.let { onSave(it) }
+                    onSave(budgetAmount, preallocations.toList())
                 },
-                enabled = budgetText.isNotBlank() && budgetText.toDoubleOrNull() != null
+                enabled = isValid
             ) {
                 Text("Save")
             }

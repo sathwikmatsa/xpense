@@ -101,4 +101,14 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
         val since = System.currentTimeMillis() - withinMs
         return transactionDao.hasRecentPendingTransaction(since, amount) > 0
     }
+
+    // Get discretionary expense (excluding preallocated categories)
+    fun getDiscretionaryExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?> {
+        return transactionDao.getDiscretionaryExpense(startDate, endDate, preallocatedCategoryIds)
+    }
+
+    // Get preallocated expense (only preallocated categories)
+    fun getPreallocatedExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?> {
+        return transactionDao.getPreallocatedExpense(startDate, endDate, preallocatedCategoryIds)
+    }
 }

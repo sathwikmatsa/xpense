@@ -6,11 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.money.tracker.data.dao.BudgetDao
+import com.money.tracker.data.dao.BudgetPreallocationDao
 import com.money.tracker.data.dao.CategoryDao
 import com.money.tracker.data.dao.SharingAppDao
 import com.money.tracker.data.dao.TransactionDao
 import com.money.tracker.data.dao.UpiReminderDao
 import com.money.tracker.data.entity.Budget
+import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.DefaultCategories
 import com.money.tracker.data.entity.SharingApp
@@ -19,8 +21,8 @@ import com.money.tracker.data.entity.UpiReminder
 import androidx.room.migration.Migration
 
 @Database(
-    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class],
-    version = 7,
+    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class],
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun upiReminderDao(): UpiReminderDao
     abstract fun sharingAppDao(): SharingAppDao
+    abstract fun budgetPreallocationDao(): BudgetPreallocationDao
 
     companion object {
         @Volatile
@@ -62,6 +65,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 7 to 8: Was preallocatedBudget on categories (reverted)
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // This migration was for adding preallocatedBudget to categories
+                // but we reverted that approach. Adding column anyway for compatibility.
+                db.execSQL("ALTER TABLE categories ADD COLUMN preallocatedBudget REAL NOT NULL DEFAULT 0")
+            }
+        }
+
+        // Migration from version 8 to 9: Add budget_preallocations table (monthly preallocations)
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS budget_preallocations (
+                        yearMonth TEXT NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        amount REAL NOT NULL,
+                        PRIMARY KEY(yearMonth, categoryId),
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_budget_preallocations_categoryId ON budget_preallocations(categoryId)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -69,7 +97,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "money_tracker_db"
                 )
-                    .addMigrations(MIGRATION_6_7)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

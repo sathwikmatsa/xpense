@@ -371,6 +371,7 @@ private fun CategoryEditDialog(
                         }
                     }
                 }
+
             }
         },
         confirmButton = {

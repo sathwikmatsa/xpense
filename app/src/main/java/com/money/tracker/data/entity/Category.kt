@@ -23,7 +23,9 @@ data class Category(
     val name: String,
     val emoji: String,
     val parentId: Long? = null,
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    @Deprecated("Use BudgetPreallocation table instead")
+    val preallocatedBudget: Double = 0.0 // Kept for DB compatibility, not used
 )
 
 object DefaultCategories {
