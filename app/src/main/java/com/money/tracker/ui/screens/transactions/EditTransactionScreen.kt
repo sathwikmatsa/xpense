@@ -117,7 +117,7 @@ fun EditTransactionScreen(
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
 
     // Initialize fields when transaction loads
-    LaunchedEffect(uiState.transaction, categories) {
+    LaunchedEffect(uiState.transaction) {
         if (!initialized && uiState.transaction != null) {
             val txn = uiState.transaction!!
             // For split transactions, show totalAmount; otherwise show amount
@@ -130,9 +130,6 @@ fun EditTransactionScreen(
             selectedType = txn.type
             selectedSource = txn.source
             selectedDateTime = txn.date
-            selectedCategory = txn.categoryId?.let { catId ->
-                categories.find { it.id == catId }
-            }
             // Initialize split state
             isSplit = txn.isSplit
             if (txn.isSplit) {
@@ -146,6 +143,13 @@ fun EditTransactionScreen(
                 }
             }
             initialized = true
+        }
+    }
+
+    // Set category when categories load (may load after transaction)
+    LaunchedEffect(uiState.transaction, categories) {
+        if (selectedCategory == null && uiState.transaction?.categoryId != null && categories.isNotEmpty()) {
+            selectedCategory = categories.find { it.id == uiState.transaction!!.categoryId }
         }
     }
 
