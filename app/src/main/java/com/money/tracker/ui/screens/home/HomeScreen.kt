@@ -235,28 +235,6 @@ fun HomeScreen(
                     }
                 }
 
-                // Category Budget Cards
-                if (uiState.categoryBudgetsWithSpending.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Category Budgets",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-
-                    items(uiState.categoryBudgetsWithSpending) { item ->
-                        CategoryBudgetCard(
-                            categoryName = item.category.name,
-                            emoji = item.category.emoji,
-                            budget = item.categoryBudget.amount,
-                            spent = item.spent,
-                            currencyFormat = currencyFormat
-                        )
-                    }
-                }
-
                 // UPI Reminders Section
                 if (uiState.upiReminders.isNotEmpty()) {
                     item {
@@ -321,37 +299,25 @@ fun HomeScreen(
                     }
                 }
 
-                // Recent Transactions Header
-                item {
-                    Text(
-                        text = "Recent Transactions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                // Transactions or Empty State
-                val displayTransactions = if (uiState.showIncome) {
-                    uiState.transactions
-                } else {
-                    uiState.transactions.filter { it.type == TransactionType.EXPENSE }
-                }
-
-                if (displayTransactions.isEmpty()) {
+                // Category Budget Cards
+                if (uiState.categoryBudgetsWithSpending.isNotEmpty()) {
                     item {
-                        EmptyState()
+                        Text(
+                            text = "Category Budgets",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
-                } else {
-                    items(displayTransactions.take(10)) { transaction ->
-                        val category = uiState.categories[transaction.categoryId]
-                        if (category != null) {
-                            TransactionCard(
-                                transaction = transaction,
-                                category = category,
-                                onClick = { onTransactionClick(transaction.id) }
-                            )
-                        }
+
+                    items(uiState.categoryBudgetsWithSpending) { item ->
+                        CategoryBudgetCard(
+                            categoryName = item.category.name,
+                            emoji = item.category.emoji,
+                            budget = item.categoryBudget.amount,
+                            spent = item.spent,
+                            currencyFormat = currencyFormat
+                        )
                     }
                 }
 
