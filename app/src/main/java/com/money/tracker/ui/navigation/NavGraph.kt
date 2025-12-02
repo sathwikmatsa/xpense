@@ -26,6 +26,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import android.app.Application
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -162,8 +164,9 @@ fun MoneyTrackerNavGraph(
             }
 
             composable(Screen.AddTransaction.route) {
+                val application = LocalContext.current.applicationContext as Application
                 val viewModel: AddTransactionViewModel = viewModel(
-                    factory = AddTransactionViewModel.Factory(transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository)
+                    factory = AddTransactionViewModel.Factory(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository)
                 )
                 AddTransactionScreen(
                     viewModel = viewModel,
@@ -183,8 +186,9 @@ fun MoneyTrackerNavGraph(
                 arguments = listOf(navArgument("transactionId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getLong("transactionId") ?: 0L
+                val application = LocalContext.current.applicationContext as Application
                 val viewModel: EditTransactionViewModel = viewModel(
-                    factory = EditTransactionViewModel.Factory(transactionId, transactionRepository, categoryRepository)
+                    factory = EditTransactionViewModel.Factory(application, transactionId, transactionRepository, categoryRepository)
                 )
                 EditTransactionScreen(
                     viewModel = viewModel,

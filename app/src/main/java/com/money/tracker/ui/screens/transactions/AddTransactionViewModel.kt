@@ -1,5 +1,8 @@
 package com.money.tracker.ui.screens.transactions
 
+import android.app.Application
+import android.app.NotificationManager
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -20,11 +23,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AddTransactionViewModel(
+    application: Application,
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository,
     private val sharingAppRepository: SharingAppRepository,
     private val upiReminderRepository: UpiReminderRepository
-) : ViewModel() {
+) : AndroidViewModel(application) {
+
+    companion object {
+        private const val UPI_REMINDER_NOTIFICATION_ID = 9999
+    }
 
     val categories: Flow<List<Category>> = categoryRepository.allCategories
     val sharingApps: Flow<List<SharingApp>> = sharingAppRepository.enabledApps
@@ -108,6 +116,9 @@ class AddTransactionViewModel(
     fun deleteUpiReminder(reminderId: Long) {
         viewModelScope.launch {
             upiReminderRepository.deleteById(reminderId)
+            // Cancel the UPI reminder notification
+            val notificationManager = getApplication<Application>().getSystemService(NotificationManager::class.java)
+            notificationManager.cancel(UPI_REMINDER_NOTIFICATION_ID)
         }
     }
 
@@ -118,6 +129,7 @@ class AddTransactionViewModel(
     }
 
     class Factory(
+        private val application: Application,
         private val transactionRepository: TransactionRepository,
         private val categoryRepository: CategoryRepository,
         private val sharingAppRepository: SharingAppRepository,
@@ -125,7 +137,7 @@ class AddTransactionViewModel(
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AddTransactionViewModel(transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository) as T
+            return AddTransactionViewModel(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository) as T
         }
     }
 }

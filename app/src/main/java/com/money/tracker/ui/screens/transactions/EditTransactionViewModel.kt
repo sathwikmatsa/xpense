@@ -1,5 +1,7 @@
 package com.money.tracker.ui.screens.transactions
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,6 +11,7 @@ import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TransactionRepository
+import com.money.tracker.service.TransactionNotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +27,11 @@ data class EditTransactionUiState(
 )
 
 class EditTransactionViewModel(
+    application: Application,
     private val transactionId: Long,
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(EditTransactionUiState())
     val uiState: StateFlow<EditTransactionUiState> = _uiState.asStateFlow()
@@ -91,6 +95,12 @@ class EditTransactionViewModel(
                 splitSynced = if (isSplit && splitChanged) false else existing.splitSynced
             )
             transactionRepository.update(updated)
+
+            // Cancel the notification if this was a pending transaction from SMS
+            if (existing.isPending) {
+                TransactionNotificationHelper.cancelNotification(getApplication(), transactionId)
+            }
+
             _uiState.value = _uiState.value.copy(isSaved = true)
         }
     }
@@ -110,13 +120,14 @@ class EditTransactionViewModel(
     }
 
     class Factory(
+        private val application: Application,
         private val transactionId: Long,
         private val transactionRepository: TransactionRepository,
         private val categoryRepository: CategoryRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return EditTransactionViewModel(transactionId, transactionRepository, categoryRepository) as T
+            return EditTransactionViewModel(application, transactionId, transactionRepository, categoryRepository) as T
         }
     }
 }
