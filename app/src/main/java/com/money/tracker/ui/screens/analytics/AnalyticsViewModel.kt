@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.repository.CategoryRepository
+import com.money.tracker.data.repository.TagRepository
 import com.money.tracker.data.repository.TransactionRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +59,8 @@ data class AnalyticsUiState(
     val transactionCount: Int = 0,
     val selectedTimeRange: AnalyticsTimeRange = AnalyticsTimeRange.MONTH,
     val categories: List<Category> = emptyList(),
+    val tags: List<Tag> = emptyList(),
+    val selectedTagId: Long? = null,
     val isLoading: Boolean = true
 )
 
@@ -66,7 +70,9 @@ data class TrendUiState(
     val totalAmount: Double = 0.0,
     val selectedTimeRange: TrendTimeRange = TrendTimeRange.WEEK,
     val selectedCategories: Set<Long> = emptySet(),
-    val categories: List<Category> = emptyList()
+    val categories: List<Category> = emptyList(),
+    val tags: List<Tag> = emptyList(),
+    val selectedTagId: Long? = null
 )
 
 data class SplitSummaryItem(
@@ -90,15 +96,26 @@ data class SplitSummaryState(
     val maxAmount: Double = 0.0
 )
 
+private data class TrendParams(
+    val timeRange: TrendTimeRange,
+    val selectedCategories: Set<Long>,
+    val selectedTagId: Long?,
+    val categories: List<Category>,
+    val tags: List<Tag>
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AnalyticsViewModel(
     private val transactionRepository: TransactionRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val tagRepository: TagRepository
 ) : ViewModel() {
 
     private val _selectedTimeRange = MutableStateFlow(AnalyticsTimeRange.MONTH)
+    private val _selectedTagId = MutableStateFlow<Long?>(null)
     private val _trendTimeRange = MutableStateFlow(TrendTimeRange.WEEK)
     private val _selectedTrendCategories = MutableStateFlow<Set<Long>>(emptySet())
+    private val _selectedTrendTagId = MutableStateFlow<Long?>(null)
 
     // Split summary: 6-month rolling window
     val splitSummaryState: StateFlow<SplitSummaryState> = combine(
@@ -244,19 +261,38 @@ class AnalyticsViewModel(
         return Pair(calendarStart.timeInMillis, endTime)
     }
 
-    val uiState: StateFlow<AnalyticsUiState> = _selectedTimeRange.flatMapLatest { timeRange ->
+    val uiState: StateFlow<AnalyticsUiState> = combine(
+        _selectedTimeRange,
+        _selectedTagId
+    ) { timeRange, tagId ->
+        Pair(timeRange, tagId)
+    }.flatMapLatest { (timeRange, selectedTagId) ->
         val (startTime, endTime) = getTimeRange(timeRange)
         combine(
             transactionRepository.getCategoryTotals(TransactionType.EXPENSE, startTime, endTime),
             categoryRepository.allCategories,
-            transactionRepository.getTransactionsBetween(startTime, endTime)
-        ) { categoryTotals, categories, transactions ->
-            val expenseTransactions = transactions.filter {
+            transactionRepository.getTransactionsBetween(startTime, endTime),
+            tagRepository.allTags
+        ) { categoryTotals, categories, transactions, tags ->
+            // Filter by tag if selected
+            val filteredTransactions = if (selectedTagId != null) {
+                transactions.filter { it.tagId == selectedTagId }
+            } else {
+                transactions
+            }
+
+            val expenseTransactions = filteredTransactions.filter {
                 !it.isPending && it.type == TransactionType.EXPENSE
             }
             val totalExpense = expenseTransactions.sumOf { it.amount }
 
-            val totalsMap = categoryTotals.associate { (it.categoryId ?: 0L) to it.total }
+            // Calculate category totals from filtered transactions (not using the pre-calculated totals when tag filter is applied)
+            val totalsMap = if (selectedTagId != null) {
+                expenseTransactions.groupBy { it.categoryId ?: 0L }
+                    .mapValues { it.value.sumOf { txn -> txn.amount } }
+            } else {
+                categoryTotals.associate { (it.categoryId ?: 0L) to it.total }
+            }
             val parentCategories = categories.filter { it.parentId == null }
 
             val breakdown = parentCategories.mapNotNull { parent ->
@@ -310,6 +346,8 @@ class AnalyticsViewModel(
                 transactionCount = expenseTransactions.size,
                 selectedTimeRange = timeRange,
                 categories = categories,
+                tags = tags,
+                selectedTagId = selectedTagId,
                 isLoading = false
             )
         }
@@ -322,19 +360,21 @@ class AnalyticsViewModel(
     val trendState: StateFlow<TrendUiState> = combine(
         _trendTimeRange,
         _selectedTrendCategories,
-        categoryRepository.allCategories
-    ) { timeRange, selectedCategories, categories ->
-        Triple(timeRange, selectedCategories, categories)
-    }.flatMapLatest { (timeRange, selectedCategories, categories) ->
-        val (startTime, endTime) = getTrendTimeRange(timeRange)
+        _selectedTrendTagId,
+        categoryRepository.allCategories,
+        tagRepository.allTags
+    ) { timeRange, selectedCategories, selectedTagId, categories, tags ->
+        TrendParams(timeRange, selectedCategories, selectedTagId, categories, tags)
+    }.flatMapLatest { params ->
+        val (startTime, endTime) = getTrendTimeRange(params.timeRange)
 
         // Build expanded categories (include children of selected parents)
-        val expandedCategories = if (selectedCategories.isEmpty()) {
+        val expandedCategories = if (params.selectedCategories.isEmpty()) {
             emptySet()
         } else {
-            val expanded = selectedCategories.toMutableSet()
-            selectedCategories.forEach { selectedId ->
-                categories.filter { it.parentId == selectedId }
+            val expanded = params.selectedCategories.toMutableSet()
+            params.selectedCategories.forEach { selectedId ->
+                params.categories.filter { it.parentId == selectedId }
                     .forEach { child -> expanded.add(child.id) }
             }
             expanded
@@ -346,22 +386,25 @@ class AnalyticsViewModel(
             val filteredTransactions = transactions.filter { txn ->
                 !txn.isPending &&
                 txn.type == TransactionType.EXPENSE &&
-                (expandedCategories.isEmpty() || txn.categoryId in expandedCategories)
+                (expandedCategories.isEmpty() || txn.categoryId in expandedCategories) &&
+                (params.selectedTagId == null || txn.tagId == params.selectedTagId)
             }
 
             // Total is sum of all filtered transactions in the range
             val totalAmount = filteredTransactions.sumOf { it.amount }
 
-            val dailySpending = calculateDailySpending(filteredTransactions, timeRange, startTime)
+            val dailySpending = calculateDailySpending(filteredTransactions, params.timeRange, startTime)
             val maxAmount = dailySpending.maxOfOrNull { it.amount } ?: 0.0
 
             TrendUiState(
                 dailySpending = dailySpending,
                 maxAmount = maxAmount,
                 totalAmount = totalAmount,
-                selectedTimeRange = timeRange,
-                selectedCategories = selectedCategories,
-                categories = categories
+                selectedTimeRange = params.timeRange,
+                selectedCategories = params.selectedCategories,
+                categories = params.categories,
+                tags = params.tags,
+                selectedTagId = params.selectedTagId
             )
         }
     }.stateIn(
@@ -548,8 +591,16 @@ class AnalyticsViewModel(
         _selectedTimeRange.value = range
     }
 
+    fun setTagFilter(tagId: Long?) {
+        _selectedTagId.value = tagId
+    }
+
     fun setTrendTimeRange(range: TrendTimeRange) {
         _trendTimeRange.value = range
+    }
+
+    fun setTrendTagFilter(tagId: Long?) {
+        _selectedTrendTagId.value = tagId
     }
 
     fun toggleTrendCategory(categoryId: Long) {
@@ -567,11 +618,12 @@ class AnalyticsViewModel(
 
     class Factory(
         private val transactionRepository: TransactionRepository,
-        private val categoryRepository: CategoryRepository
+        private val categoryRepository: CategoryRepository,
+        private val tagRepository: TagRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AnalyticsViewModel(transactionRepository, categoryRepository) as T
+            return AnalyticsViewModel(transactionRepository, categoryRepository, tagRepository) as T
         }
     }
 }

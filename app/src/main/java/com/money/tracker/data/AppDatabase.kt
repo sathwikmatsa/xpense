@@ -10,6 +10,8 @@ import com.money.tracker.data.dao.BudgetPreallocationDao
 import com.money.tracker.data.dao.CategoryBudgetDao
 import com.money.tracker.data.dao.CategoryDao
 import com.money.tracker.data.dao.SharingAppDao
+import com.money.tracker.data.dao.TagBudgetDao
+import com.money.tracker.data.dao.TagDao
 import com.money.tracker.data.dao.TransactionDao
 import com.money.tracker.data.dao.UpiReminderDao
 import com.money.tracker.data.entity.Budget
@@ -17,14 +19,17 @@ import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.CategoryBudget
 import com.money.tracker.data.entity.DefaultCategories
+import com.money.tracker.data.entity.DefaultTags
 import com.money.tracker.data.entity.SharingApp
+import com.money.tracker.data.entity.Tag
+import com.money.tracker.data.entity.TagBudget
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.UpiReminder
 import androidx.room.migration.Migration
 
 @Database(
-    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class],
-    version = 10,
+    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class, Tag::class, TagBudget::class],
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +41,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sharingAppDao(): SharingAppDao
     abstract fun budgetPreallocationDao(): BudgetPreallocationDao
     abstract fun categoryBudgetDao(): CategoryBudgetDao
+    abstract fun tagDao(): TagDao
+    abstract fun tagBudgetDao(): TagBudgetDao
 
     companion object {
         @Volatile
@@ -109,6 +116,82 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 10 to 11: Add tags table, tag_budgets table, and tagId to transactions
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create tags table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        emoji TEXT NOT NULL,
+                        color INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                // Create tag_budgets table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tag_budgets (
+                        yearMonth TEXT NOT NULL,
+                        tagId INTEGER NOT NULL,
+                        amount REAL NOT NULL,
+                        PRIMARY KEY(yearMonth, tagId),
+                        FOREIGN KEY(tagId) REFERENCES tags(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tag_budgets_tagId ON tag_budgets(tagId)")
+
+                // Insert default tags first (before recreating transactions table with FK)
+                db.execSQL("INSERT INTO tags (name, emoji, color) VALUES ('Travel', '✈️', ${0xFF2196F3})")
+                db.execSQL("INSERT INTO tags (name, emoji, color) VALUES ('Party', '🎉', ${0xFFFF9800})")
+                db.execSQL("INSERT INTO tags (name, emoji, color) VALUES ('Gift', '🎁', ${0xFFE91E63})")
+                db.execSQL("INSERT INTO tags (name, emoji, color) VALUES ('Holiday', '🎄', ${0xFF4CAF50})")
+                db.execSQL("INSERT INTO tags (name, emoji, color) VALUES ('Work Trip', '💼', ${0xFF607D8B})")
+
+                // Recreate transactions table with tagId foreign key (SQLite doesn't support adding FK via ALTER)
+                db.execSQL("""
+                    CREATE TABLE transactions_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        amount REAL NOT NULL,
+                        type TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        merchant TEXT,
+                        categoryId INTEGER,
+                        source TEXT NOT NULL,
+                        date INTEGER NOT NULL,
+                        rawMessage TEXT,
+                        isManual INTEGER NOT NULL,
+                        isPending INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        isSplit INTEGER NOT NULL,
+                        splitNumerator INTEGER NOT NULL,
+                        splitDenominator INTEGER NOT NULL,
+                        totalAmount REAL NOT NULL,
+                        splitSynced INTEGER NOT NULL,
+                        tagId INTEGER,
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE SET NULL,
+                        FOREIGN KEY(tagId) REFERENCES tags(id) ON DELETE SET NULL
+                    )
+                """.trimIndent())
+
+                // Copy data from old table
+                db.execSQL("""
+                    INSERT INTO transactions_new (id, amount, type, description, merchant, categoryId, source, date, rawMessage, isManual, isPending, createdAt, isSplit, splitNumerator, splitDenominator, totalAmount, splitSynced, tagId)
+                    SELECT id, amount, type, description, merchant, categoryId, source, date, rawMessage, isManual, isPending, createdAt, isSplit, splitNumerator, splitDenominator, totalAmount, splitSynced, NULL
+                    FROM transactions
+                """.trimIndent())
+
+                // Drop old table and rename new one
+                db.execSQL("DROP TABLE transactions")
+                db.execSQL("ALTER TABLE transactions_new RENAME TO transactions")
+
+                // Recreate indices
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_categoryId ON transactions(categoryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_date ON transactions(date)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_tagId ON transactions(tagId)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -116,18 +199,20 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "money_tracker_db"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
                             insertDefaultCategories(db)
                             insertDefaultSharingApps(db)
+                            insertDefaultTags(db)
                         }
 
                         override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
                             super.onDestructiveMigration(db)
                             insertDefaultCategories(db)
                             insertDefaultSharingApps(db)
+                            insertDefaultTags(db)
                         }
 
                         private fun insertDefaultCategories(db: SupportSQLiteDatabase) {
@@ -148,6 +233,15 @@ abstract class AppDatabase : RoomDatabase() {
                                 db.execSQL(
                                     "INSERT INTO sharing_apps (name, packageName, isEnabled, sortOrder) VALUES (?, ?, 1, ?)",
                                     arrayOf(name, packageName, order)
+                                )
+                            }
+                        }
+
+                        private fun insertDefaultTags(db: SupportSQLiteDatabase) {
+                            DefaultTags.list.forEach { tag ->
+                                db.execSQL(
+                                    "INSERT INTO tags (name, emoji, color) VALUES (?, ?, ?)",
+                                    arrayOf(tag.name, tag.emoji, tag.color)
                                 )
                             }
                         }

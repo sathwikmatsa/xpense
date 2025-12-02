@@ -70,10 +70,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.SplitShare
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.CategoryPickerDialog
+import com.money.tracker.ui.components.TagChip
+import com.money.tracker.ui.components.TagPickerDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -88,11 +91,13 @@ fun EditTransactionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val tags by viewModel.tags.collectAsState()
 
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    var selectedTag by remember { mutableStateOf<Tag?>(null) }
     var selectedSource by remember { mutableStateOf(TransactionSource.UPI) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var initialized by remember { mutableStateOf(false) }
@@ -105,6 +110,7 @@ fun EditTransactionScreen(
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showTagPicker by remember { mutableStateOf(false) }
     var sourceExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -153,6 +159,13 @@ fun EditTransactionScreen(
         }
     }
 
+    // Set tag when tags load (may load after transaction)
+    LaunchedEffect(uiState.transaction, tags) {
+        if (selectedTag == null && uiState.transaction?.tagId != null && tags.isNotEmpty()) {
+            selectedTag = tags.find { it.id == uiState.transaction!!.tagId }
+        }
+    }
+
     // Navigate back on save or delete
     LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
         if (uiState.isSaved || uiState.isDeleted) {
@@ -192,6 +205,18 @@ fun EditTransactionScreen(
                 viewModel.createCategory(name, emoji, parentId)
             },
             onDismiss = { showCategoryPicker = false }
+        )
+    }
+
+    if (showTagPicker) {
+        TagPickerDialog(
+            tags = tags,
+            selectedTag = selectedTag,
+            onTagSelected = { selectedTag = it },
+            onCreateTag = { name, emoji, color ->
+                viewModel.createTag(name, emoji, color)
+            },
+            onDismiss = { showTagPicker = false }
         )
     }
 
@@ -328,6 +353,7 @@ fun EditTransactionScreen(
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
                                 date = selectedDateTime,
+                                tagId = selectedTag?.id,
                                 isSplit = isSplit,
                                 splitNumerator = selectedSplitShare.numerator,
                                 splitDenominator = selectedSplitShare.denominator,
@@ -607,6 +633,47 @@ fun EditTransactionScreen(
                     } else {
                         Text(
                             text = "Tap to select category",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Tag Picker (Optional)
+                Text(
+                    text = "Tag (Optional)",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                if (selectedTag != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TagChip(
+                            tag = selectedTag!!,
+                            onClear = { selectedTag = null }
+                        )
+                        Text(
+                            text = "Tap to change",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.clickable { showTagPicker = true }
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showTagPicker = true }
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Tap to add tag (e.g., Travel, Holiday)",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

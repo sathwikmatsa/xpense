@@ -25,11 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.BarChart
+import com.money.tracker.data.entity.Tag
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -106,7 +108,8 @@ fun AnalyticsScreen(
                     currencyFormat = currencyFormat,
                     showPieChart = showPieChart,
                     onToggleView = { showPieChart = !showPieChart },
-                    onTimeRangeChange = { viewModel.setTimeRange(it) }
+                    onTimeRangeChange = { viewModel.setTimeRange(it) },
+                    onTagChange = { viewModel.setTagFilter(it) }
                 )
             }
 
@@ -117,7 +120,8 @@ fun AnalyticsScreen(
                     currencyFormat = currencyFormat,
                     onTimeRangeChange = { viewModel.setTrendTimeRange(it) },
                     onCategoryToggle = { viewModel.toggleTrendCategory(it) },
-                    onClearCategories = { viewModel.clearTrendCategories() }
+                    onClearCategories = { viewModel.clearTrendCategories() },
+                    onTagChange = { viewModel.setTrendTagFilter(it) }
                 )
             }
 
@@ -145,9 +149,12 @@ private fun SpendingOverviewWidget(
     currencyFormat: NumberFormat,
     showPieChart: Boolean,
     onToggleView: () -> Unit,
-    onTimeRangeChange: (AnalyticsTimeRange) -> Unit
+    onTimeRangeChange: (AnalyticsTimeRange) -> Unit,
+    onTagChange: (Long?) -> Unit
 ) {
     var showTimeRangeDropdown by remember { mutableStateOf(false) }
+    var showTagDropdown by remember { mutableStateOf(false) }
+    val selectedTag = uiState.tags.find { it.id == uiState.selectedTagId }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -249,6 +256,91 @@ private fun SpendingOverviewWidget(
                 modifier = Modifier.padding(top = 8.dp)
             )
 
+            // Tag filter (show only if there are tags)
+            if (uiState.tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box {
+                        Surface(
+                            modifier = Modifier
+                                .clickable { showTagDropdown = true }
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selectedTag != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ),
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedTag != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (selectedTag != null) "${selectedTag.emoji} ${selectedTag.name}" else "All tags",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (selectedTag != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Select tag",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (selectedTag != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = showTagDropdown,
+                            onDismissRequest = { showTagDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("All tags") },
+                                onClick = {
+                                    onTagChange(null)
+                                    showTagDropdown = false
+                                },
+                                leadingIcon = if (uiState.selectedTagId == null) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                } else null
+                            )
+                            uiState.tags.forEach { tag ->
+                                DropdownMenuItem(
+                                    text = { Text("${tag.emoji} ${tag.name}") },
+                                    onClick = {
+                                        onTagChange(tag.id)
+                                        showTagDropdown = false
+                                    },
+                                    leadingIcon = if (uiState.selectedTagId == tag.id) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
+                    if (selectedTag != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            modifier = Modifier.clickable { onTagChange(null) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Clear tag filter",
+                                modifier = Modifier
+                                    .padding(6.dp)
+                                    .size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             // Category breakdown
@@ -292,15 +384,18 @@ private fun SpendingTrendWidget(
     currencyFormat: NumberFormat,
     onTimeRangeChange: (TrendTimeRange) -> Unit,
     onCategoryToggle: (Long) -> Unit,
-    onClearCategories: () -> Unit
+    onClearCategories: () -> Unit,
+    onTagChange: (Long?) -> Unit
 ) {
     var showTimeRangeDropdown by remember { mutableStateOf(false) }
     var showCategoryDialog by remember { mutableStateOf(false) }
+    var showTagDropdown by remember { mutableStateOf(false) }
 
     val parentCategories = trendState.categories.filter { it.parentId == null }
     val selectedCategoryNames = parentCategories
         .filter { it.id in trendState.selectedCategories }
         .map { it.name }
+    val selectedTag = trendState.tags.find { it.id == trendState.selectedTagId }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -436,6 +531,91 @@ private fun SpendingTrendWidget(
                                 imageVector = Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Select categories",
                                 modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Tag filter (show only if there are tags)
+            if (trendState.tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box {
+                        Surface(
+                            modifier = Modifier
+                                .clickable { showTagDropdown = true }
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selectedTag != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ),
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedTag != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (selectedTag != null) "${selectedTag.emoji} ${selectedTag.name}" else "All tags",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (selectedTag != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Select tag",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (selectedTag != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = showTagDropdown,
+                            onDismissRequest = { showTagDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("All tags") },
+                                onClick = {
+                                    onTagChange(null)
+                                    showTagDropdown = false
+                                },
+                                leadingIcon = if (trendState.selectedTagId == null) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                } else null
+                            )
+                            trendState.tags.forEach { tag ->
+                                DropdownMenuItem(
+                                    text = { Text("${tag.emoji} ${tag.name}") },
+                                    onClick = {
+                                        onTagChange(tag.id)
+                                        showTagDropdown = false
+                                    },
+                                    leadingIcon = if (trendState.selectedTagId == tag.id) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
+                    if (selectedTag != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            modifier = Modifier.clickable { onTagChange(null) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Clear tag filter",
+                                modifier = Modifier
+                                    .padding(6.dp)
+                                    .size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

@@ -75,10 +75,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.SplitShare
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.CategoryPickerDialog
+import com.money.tracker.ui.components.TagChip
+import com.money.tracker.ui.components.TagPickerDialog
 import com.money.tracker.ui.screens.settings.getSavedSharingApp
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -95,12 +98,14 @@ fun AddTransactionScreen(
     onSaved: () -> Unit
 ) {
     val categories by viewModel.categories.collectAsState(initial = emptyList())
+    val tags by viewModel.tags.collectAsState(initial = emptyList())
     val recommendedCategories by viewModel.recommendedCategories.collectAsState()
 
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    var selectedTag by remember { mutableStateOf<Tag?>(null) }
     var selectedSource by remember { mutableStateOf(initialSource) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
@@ -110,6 +115,7 @@ fun AddTransactionScreen(
     var customMyShare by remember { mutableStateOf("") }
 
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showTagPicker by remember { mutableStateOf(false) }
     var sourceExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -147,6 +153,18 @@ fun AddTransactionScreen(
                 viewModel.createCategory(name, emoji, parentId)
             },
             onDismiss = { showCategoryPicker = false }
+        )
+    }
+
+    if (showTagPicker) {
+        TagPickerDialog(
+            tags = tags,
+            selectedTag = selectedTag,
+            onTagSelected = { selectedTag = it },
+            onCreateTag = { name, emoji, color ->
+                viewModel.createTag(name, emoji, color)
+            },
+            onDismiss = { showTagPicker = false }
         )
     }
 
@@ -273,7 +291,8 @@ fun AddTransactionScreen(
                             type = selectedType,
                             categoryId = selectedCategory!!.id,
                             source = selectedSource,
-                            date = selectedDateTime
+                            date = selectedDateTime,
+                            tagId = selectedTag?.id
                         )
                         onSaved()
                     }
@@ -536,6 +555,47 @@ fun AddTransactionScreen(
                 }
             }
 
+            // Tag Picker (Optional)
+            Text(
+                text = "Tag (Optional)",
+                style = MaterialTheme.typography.labelLarge
+            )
+            if (selectedTag != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TagChip(
+                        tag = selectedTag!!,
+                        onClear = { selectedTag = null }
+                    )
+                    Text(
+                        text = "Tap to change",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { showTagPicker = true }
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showTagPicker = true }
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Tap to add tag (e.g., Travel, Holiday)",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             // Source Dropdown
             ExposedDropdownMenuBox(
                 expanded = sourceExpanded,
@@ -597,6 +657,7 @@ fun AddTransactionScreen(
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
                                 date = selectedDateTime,
+                                tagId = selectedTag?.id,
                                 isSplit = true,
                                 splitNumerator = selectedSplitShare.numerator,
                                 splitDenominator = selectedSplitShare.denominator,
@@ -633,6 +694,7 @@ fun AddTransactionScreen(
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
                                 date = selectedDateTime,
+                                tagId = selectedTag?.id,
                                 isSplit = true,
                                 splitNumerator = selectedSplitShare.numerator,
                                 splitDenominator = selectedSplitShare.denominator,

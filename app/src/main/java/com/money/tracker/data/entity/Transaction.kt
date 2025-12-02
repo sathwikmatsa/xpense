@@ -13,9 +13,15 @@ import androidx.room.PrimaryKey
             parentColumns = ["id"],
             childColumns = ["categoryId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = Tag::class,
+            parentColumns = ["id"],
+            childColumns = ["tagId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
-    indices = [Index("categoryId"), Index("date")]
+    indices = [Index("categoryId"), Index("date"), Index("tagId")]
 )
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
@@ -25,6 +31,7 @@ data class Transaction(
     val description: String,
     val merchant: String? = null,
     val categoryId: Long? = null,
+    val tagId: Long? = null, // Optional contextual tag (e.g., Travel, Holiday)
     val source: TransactionSource,
     val date: Long, // epoch millis
     val rawMessage: String? = null, // original SMS/email for reference

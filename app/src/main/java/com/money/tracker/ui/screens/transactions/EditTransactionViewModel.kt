@@ -6,10 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.repository.CategoryRepository
+import com.money.tracker.data.repository.TagRepository
 import com.money.tracker.data.repository.TransactionRepository
 import com.money.tracker.service.TransactionNotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,13 +32,17 @@ class EditTransactionViewModel(
     application: Application,
     private val transactionId: Long,
     private val transactionRepository: TransactionRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val tagRepository: TagRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(EditTransactionUiState())
     val uiState: StateFlow<EditTransactionUiState> = _uiState.asStateFlow()
 
     val categories: StateFlow<List<Category>> = categoryRepository.allCategories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val tags: StateFlow<List<Tag>> = tagRepository.allTags
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
@@ -60,6 +66,7 @@ class EditTransactionViewModel(
         categoryId: Long,
         source: TransactionSource,
         date: Long,
+        tagId: Long? = null,
         isSplit: Boolean = false,
         splitNumerator: Int = 1,
         splitDenominator: Int = 1,
@@ -85,6 +92,7 @@ class EditTransactionViewModel(
                 description = description,
                 type = type,
                 categoryId = categoryId,
+                tagId = tagId,
                 source = source,
                 date = date,
                 isPending = false,
@@ -111,6 +119,12 @@ class EditTransactionViewModel(
         }
     }
 
+    fun createTag(name: String, emoji: String, color: Long) {
+        viewModelScope.launch {
+            tagRepository.insert(Tag(name = name, emoji = emoji, color = color))
+        }
+    }
+
     fun deleteTransaction() {
         viewModelScope.launch {
             val existing = _uiState.value.transaction ?: return@launch
@@ -123,11 +137,12 @@ class EditTransactionViewModel(
         private val application: Application,
         private val transactionId: Long,
         private val transactionRepository: TransactionRepository,
-        private val categoryRepository: CategoryRepository
+        private val categoryRepository: CategoryRepository,
+        private val tagRepository: TagRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return EditTransactionViewModel(application, transactionId, transactionRepository, categoryRepository) as T
+            return EditTransactionViewModel(application, transactionId, transactionRepository, categoryRepository, tagRepository) as T
         }
     }
 }

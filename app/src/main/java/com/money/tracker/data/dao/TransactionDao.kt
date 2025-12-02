@@ -123,9 +123,40 @@ interface TransactionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWithId(transaction: Transaction)
+
+    // Tag-related queries
+    @Query("SELECT * FROM transactions WHERE tagId = :tagId ORDER BY date DESC")
+    fun getByTag(tagId: Long): Flow<List<Transaction>>
+
+    @Query("""
+        SELECT tagId, SUM(amount) as total
+        FROM transactions
+        WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        GROUP BY tagId
+    """)
+    fun getTagTotals(type: TransactionType, startDate: Long, endDate: Long): Flow<List<TagTotal>>
+
+    @Query("""
+        SELECT categoryId, SUM(amount) as total
+        FROM transactions
+        WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0 AND tagId = :tagId
+        GROUP BY categoryId
+    """)
+    fun getCategoryTotalsForTag(type: TransactionType, startDate: Long, endDate: Long, tagId: Long): Flow<List<CategoryTotal>>
+
+    @Query("SELECT * FROM transactions WHERE date BETWEEN :startDate AND :endDate AND tagId = :tagId ORDER BY date DESC")
+    fun getTransactionsBetweenWithTag(startDate: Long, endDate: Long, tagId: Long): Flow<List<Transaction>>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE tagId = :tagId")
+    suspend fun getTransactionCountByTag(tagId: Long): Int
 }
 
 data class CategoryTotal(
     val categoryId: Long?,
+    val total: Double
+)
+
+data class TagTotal(
+    val tagId: Long?,
     val total: Double
 )

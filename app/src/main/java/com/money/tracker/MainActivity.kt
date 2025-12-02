@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
                     sharingAppRepository = app.sharingAppRepository,
                     budgetPreallocationRepository = app.budgetPreallocationRepository,
                     categoryBudgetRepository = app.categoryBudgetRepository,
+                    tagRepository = app.tagRepository,
                     openAddTransaction = openAddTransaction,
                     upiReminderId = upiReminderId,
                     upiPackageName = upiPackageName,

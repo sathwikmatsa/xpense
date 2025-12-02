@@ -7,12 +7,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.money.tracker.data.entity.Category
+import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.entity.SharingApp
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.SharingAppRepository
+import com.money.tracker.data.repository.TagRepository
 import com.money.tracker.data.repository.TransactionRepository
 import com.money.tracker.data.repository.UpiReminderRepository
 import com.money.tracker.util.CategoryRecommender
@@ -27,7 +29,8 @@ class AddTransactionViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryRepository: CategoryRepository,
     private val sharingAppRepository: SharingAppRepository,
-    private val upiReminderRepository: UpiReminderRepository
+    private val upiReminderRepository: UpiReminderRepository,
+    private val tagRepository: TagRepository
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -35,6 +38,7 @@ class AddTransactionViewModel(
     }
 
     val categories: Flow<List<Category>> = categoryRepository.allCategories
+    val tags: Flow<List<Tag>> = tagRepository.allTags
     val sharingApps: Flow<List<SharingApp>> = sharingAppRepository.enabledApps
 
     private val categoryRecommender = CategoryRecommender()
@@ -81,6 +85,7 @@ class AddTransactionViewModel(
         categoryId: Long,
         source: TransactionSource,
         date: Long,
+        tagId: Long? = null,
         isSplit: Boolean = false,
         splitNumerator: Int = 1,
         splitDenominator: Int = 1,
@@ -100,6 +105,7 @@ class AddTransactionViewModel(
                 description = description,
                 type = type,
                 categoryId = categoryId,
+                tagId = tagId,
                 source = source,
                 date = date,
                 isManual = true,
@@ -128,16 +134,23 @@ class AddTransactionViewModel(
         }
     }
 
+    fun createTag(name: String, emoji: String, color: Long) {
+        viewModelScope.launch {
+            tagRepository.insert(Tag(name = name, emoji = emoji, color = color))
+        }
+    }
+
     class Factory(
         private val application: Application,
         private val transactionRepository: TransactionRepository,
         private val categoryRepository: CategoryRepository,
         private val sharingAppRepository: SharingAppRepository,
-        private val upiReminderRepository: UpiReminderRepository
+        private val upiReminderRepository: UpiReminderRepository,
+        private val tagRepository: TagRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AddTransactionViewModel(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository) as T
+            return AddTransactionViewModel(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository, tagRepository) as T
         }
     }
 }

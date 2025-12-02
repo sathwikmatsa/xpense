@@ -8,6 +8,8 @@ import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.CategoryBudget
 import com.money.tracker.data.entity.SharingApp
+import com.money.tracker.data.entity.Tag
+import com.money.tracker.data.entity.TagBudget
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
@@ -21,7 +23,7 @@ import java.io.InputStreamReader
 class DatabaseBackupManager(private val context: Context) {
 
     companion object {
-        const val CURRENT_BACKUP_VERSION = 10
+        const val CURRENT_BACKUP_VERSION = 11
     }
 
     data class BackupResult(
@@ -42,6 +44,8 @@ class DatabaseBackupManager(private val context: Context) {
                 put("budgetPreallocations", exportBudgetPreallocations(db))
                 put("categoryBudgets", exportCategoryBudgets(db))
                 put("sharingApps", exportSharingApps(db))
+                put("tags", exportTags(db))
+                put("tagBudgets", exportTagBudgets(db))
             }
 
             context.contentResolver.openOutputStream(uri)?.use { outputStream ->
@@ -79,6 +83,12 @@ class DatabaseBackupManager(private val context: Context) {
             }
             if (version >= 7 && backup.has("sharingApps")) {
                 importSharingApps(db, backup.getJSONArray("sharingApps"))
+            }
+            if (version >= 11 && backup.has("tags")) {
+                importTags(db, backup.getJSONArray("tags"))
+            }
+            if (version >= 11 && backup.has("tagBudgets")) {
+                importTagBudgets(db, backup.getJSONArray("tagBudgets"))
             }
 
             BackupResult(true, "Backup imported successfully")
@@ -125,6 +135,7 @@ class DatabaseBackupManager(private val context: Context) {
                     put("splitDenominator", txn.splitDenominator)
                     put("totalAmount", txn.totalAmount)
                     put("splitSynced", txn.splitSynced)
+                    put("tagId", txn.tagId ?: JSONObject.NULL)
                 })
             }
         }
@@ -183,7 +194,35 @@ class DatabaseBackupManager(private val context: Context) {
         }
     }
 
+    private suspend fun exportTags(db: AppDatabase): JSONArray {
+        val tags = db.tagDao().getAllTagsSync()
+        return JSONArray().apply {
+            tags.forEach { tag ->
+                put(JSONObject().apply {
+                    put("id", tag.id)
+                    put("name", tag.name)
+                    put("emoji", tag.emoji)
+                    put("color", tag.color)
+                })
+            }
+        }
+    }
+
+    private suspend fun exportTagBudgets(db: AppDatabase): JSONArray {
+        val tagBudgets = db.tagBudgetDao().getAllTagBudgetsSync()
+        return JSONArray().apply {
+            tagBudgets.forEach { tb ->
+                put(JSONObject().apply {
+                    put("yearMonth", tb.yearMonth)
+                    put("tagId", tb.tagId)
+                    put("amount", tb.amount)
+                })
+            }
+        }
+    }
+
     // Import functions with version migration
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun importCategories(db: AppDatabase, array: JSONArray, version: Int) {
         val categoryDao = db.categoryDao()
         // Clear existing non-default categories or all if importing
@@ -215,6 +254,7 @@ class DatabaseBackupManager(private val context: Context) {
             val splitDenominator = if (version >= 7) obj.optInt("splitDenominator", 1) else 1
             val totalAmount = if (version >= 7) obj.optDouble("totalAmount", 0.0) else 0.0
             val splitSynced = if (version >= 7) obj.optBoolean("splitSynced", false) else false
+            val tagId = if (version >= 11 && !obj.isNull("tagId")) obj.getLong("tagId") else null
 
             val transaction = Transaction(
                 id = obj.getLong("id"),
@@ -237,12 +277,14 @@ class DatabaseBackupManager(private val context: Context) {
                 splitNumerator = splitNumerator,
                 splitDenominator = splitDenominator,
                 totalAmount = totalAmount,
-                splitSynced = splitSynced
+                splitSynced = splitSynced,
+                tagId = tagId
             )
             transactionDao.insertWithId(transaction)
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun importBudgets(db: AppDatabase, array: JSONArray, version: Int) {
         val budgetDao = db.budgetDao()
         budgetDao.deleteAllBudgets()
@@ -301,6 +343,37 @@ class DatabaseBackupManager(private val context: Context) {
                 sortOrder = obj.optInt("sortOrder", 0)
             )
             dao.insertWithId(app)
+        }
+    }
+
+    private suspend fun importTags(db: AppDatabase, array: JSONArray) {
+        val dao = db.tagDao()
+        dao.deleteAllTags()
+
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val tag = Tag(
+                id = obj.getLong("id"),
+                name = obj.getString("name"),
+                emoji = obj.getString("emoji"),
+                color = obj.getLong("color")
+            )
+            dao.insertWithId(tag)
+        }
+    }
+
+    private suspend fun importTagBudgets(db: AppDatabase, array: JSONArray) {
+        val dao = db.tagBudgetDao()
+        dao.deleteAllTagBudgets()
+
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val tagBudget = TagBudget(
+                yearMonth = obj.getString("yearMonth"),
+                tagId = obj.getLong("tagId"),
+                amount = obj.getDouble("amount")
+            )
+            dao.insert(tagBudget)
         }
     }
 }

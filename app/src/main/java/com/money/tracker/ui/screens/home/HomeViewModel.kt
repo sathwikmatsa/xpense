@@ -6,12 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.money.tracker.data.entity.BudgetPreallocation
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.CategoryBudget
+import com.money.tracker.data.entity.Tag
+import com.money.tracker.data.entity.TagBudget
 import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.UpiReminder
 import com.money.tracker.data.repository.BudgetPreallocationRepository
 import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryBudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
+import com.money.tracker.data.repository.TagRepository
 import com.money.tracker.data.repository.TransactionRepository
 import com.money.tracker.data.repository.UpiReminderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,22 +33,32 @@ data class CategoryBudgetWithSpending(
     val category: Category
 )
 
+data class TagBudgetWithSpending(
+    val tagBudget: TagBudget,
+    val spent: Double,
+    val tag: Tag
+)
+
 data class HomeUiState(
     val transactions: List<Transaction> = emptyList(),
     val pendingTransactions: List<Transaction> = emptyList(),
     val unsyncedSplitTransactions: List<Transaction> = emptyList(),
     val upiReminders: List<UpiReminder> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
+    val tags: Map<Long, Tag> = emptyMap(),
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
     val paidForOthers: Double = 0.0,
     val budget: Double? = null,
     val preallocations: List<BudgetPreallocation> = emptyList(),
     val preallocatedBudget: Double = 0.0,
+    val tagBudgetTotal: Double = 0.0,
     val discretionaryExpense: Double = 0.0,
     val preallocatedExpense: Double = 0.0,
+    val tagExpense: Double = 0.0,
     val categoryBudgets: List<CategoryBudget> = emptyList(),
     val categoryBudgetsWithSpending: List<CategoryBudgetWithSpending> = emptyList(),
+    val tagBudgetsWithSpending: List<TagBudgetWithSpending> = emptyList(),
     val showIncome: Boolean = false,
     val isLoading: Boolean = true
 )
@@ -56,7 +69,8 @@ class HomeViewModel(
     private val budgetRepository: BudgetRepository,
     private val upiReminderRepository: UpiReminderRepository,
     private val budgetPreallocationRepository: BudgetPreallocationRepository,
-    private val categoryBudgetRepository: CategoryBudgetRepository
+    private val categoryBudgetRepository: CategoryBudgetRepository,
+    private val tagRepository: TagRepository
 ) : ViewModel() {
 
     private val calendar = Calendar.getInstance()
@@ -160,6 +174,31 @@ class HomeViewModel(
             categoryBudgets = categoryBudgets,
             categoryBudgetsWithSpending = categoryBudgetsWithSpending
         )
+    }.combine(tagRepository.allTags) { state, tags ->
+        state.copy(tags = tags.associateBy { it.id })
+    }.combine(tagRepository.getTagBudgetsForMonth(currentYearMonth)) { state, tagBudgets ->
+        // Calculate spending per tag with budget
+        val tagBudgetsWithSpending = tagBudgets.mapNotNull { tb ->
+            val tag = state.tags[tb.tagId] ?: return@mapNotNull null
+            val spent = state.transactions
+                .filter { it.tagId == tb.tagId }
+                .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+                .sumOf { it.amount }
+            TagBudgetWithSpending(tb, spent, tag)
+        }
+        // Calculate total tag budget allocation
+        val tagBudgetTotal = tagBudgets.sumOf { it.amount }
+        // Calculate spending on transactions with tags that have budgets
+        val tagIdsWithBudget = tagBudgets.map { it.tagId }.toSet()
+        val tagExpense = state.transactions
+            .filter { it.tagId != null && it.tagId in tagIdsWithBudget }
+            .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+            .sumOf { it.amount }
+        state.copy(
+            tagBudgetsWithSpending = tagBudgetsWithSpending,
+            tagBudgetTotal = tagBudgetTotal,
+            tagExpense = tagExpense
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -246,11 +285,12 @@ class HomeViewModel(
         private val budgetRepository: BudgetRepository,
         private val upiReminderRepository: UpiReminderRepository,
         private val budgetPreallocationRepository: BudgetPreallocationRepository,
-        private val categoryBudgetRepository: CategoryBudgetRepository
+        private val categoryBudgetRepository: CategoryBudgetRepository,
+        private val tagRepository: TagRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return HomeViewModel(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository, categoryBudgetRepository) as T
+            return HomeViewModel(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository, categoryBudgetRepository, tagRepository) as T
         }
     }
 }

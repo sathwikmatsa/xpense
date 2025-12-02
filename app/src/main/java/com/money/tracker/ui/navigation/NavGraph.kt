@@ -50,6 +50,7 @@ import com.money.tracker.data.repository.BudgetRepository
 import com.money.tracker.data.repository.CategoryBudgetRepository
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.SharingAppRepository
+import com.money.tracker.data.repository.TagRepository
 import com.money.tracker.data.repository.TransactionRepository
 import com.money.tracker.data.repository.UpiReminderRepository
 import com.money.tracker.ui.screens.analytics.AnalyticsScreen
@@ -65,6 +66,10 @@ import com.money.tracker.ui.screens.transactions.EditTransactionViewModel
 import com.money.tracker.ui.screens.settings.SettingsScreen
 import com.money.tracker.ui.screens.settings.CategoriesScreen
 import com.money.tracker.ui.screens.settings.CategoriesViewModel
+import com.money.tracker.ui.screens.settings.TagsScreen
+import com.money.tracker.ui.screens.settings.TagsViewModel
+import com.money.tracker.ui.screens.budget.BudgetScreen
+import com.money.tracker.ui.screens.budget.BudgetViewModel
 import com.money.tracker.data.entity.TransactionSource
 
 sealed class Screen(val route: String) {
@@ -77,6 +82,8 @@ sealed class Screen(val route: String) {
     }
     data object Settings : Screen("settings")
     data object Categories : Screen("categories")
+    data object Tags : Screen("tags")
+    data object Budget : Screen("budget")
 }
 
 data class BottomNavItem(
@@ -101,6 +108,7 @@ fun MoneyTrackerNavGraph(
     sharingAppRepository: SharingAppRepository,
     budgetPreallocationRepository: BudgetPreallocationRepository,
     categoryBudgetRepository: CategoryBudgetRepository,
+    tagRepository: TagRepository,
     openAddTransaction: Boolean = false,
     upiReminderId: Long = -1L,
     upiPackageName: String = "",
@@ -140,7 +148,7 @@ fun MoneyTrackerNavGraph(
             ) {
             composable(Screen.Home.route) {
                 val viewModel: HomeViewModel = viewModel(
-                    factory = HomeViewModel.Factory(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository, categoryBudgetRepository)
+                    factory = HomeViewModel.Factory(transactionRepository, categoryRepository, budgetRepository, upiReminderRepository, budgetPreallocationRepository, categoryBudgetRepository, tagRepository)
                 )
                 HomeScreen(
                     viewModel = viewModel,
@@ -148,6 +156,7 @@ fun MoneyTrackerNavGraph(
                         navController.navigate(Screen.EditTransaction.createRoute(id))
                     },
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                    onBudgetClick = { navController.navigate(Screen.Budget.route) },
                     onOpenUpiApp = onOpenUpiApp
                 )
             }
@@ -166,7 +175,7 @@ fun MoneyTrackerNavGraph(
 
             composable(Screen.Analytics.route) {
                 val viewModel: AnalyticsViewModel = viewModel(
-                    factory = AnalyticsViewModel.Factory(transactionRepository, categoryRepository)
+                    factory = AnalyticsViewModel.Factory(transactionRepository, categoryRepository, tagRepository)
                 )
                 AnalyticsScreen(viewModel = viewModel)
             }
@@ -174,7 +183,7 @@ fun MoneyTrackerNavGraph(
             composable(Screen.AddTransaction.route) {
                 val application = LocalContext.current.applicationContext as Application
                 val viewModel: AddTransactionViewModel = viewModel(
-                    factory = AddTransactionViewModel.Factory(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository)
+                    factory = AddTransactionViewModel.Factory(application, transactionRepository, categoryRepository, sharingAppRepository, upiReminderRepository, tagRepository)
                 )
                 // Map UPI package name to TransactionSource
                 val initialSource = when (currentUpiPackageName) {
@@ -206,7 +215,7 @@ fun MoneyTrackerNavGraph(
                 val transactionId = backStackEntry.arguments?.getLong("transactionId") ?: 0L
                 val application = LocalContext.current.applicationContext as Application
                 val viewModel: EditTransactionViewModel = viewModel(
-                    factory = EditTransactionViewModel.Factory(application, transactionId, transactionRepository, categoryRepository)
+                    factory = EditTransactionViewModel.Factory(application, transactionId, transactionRepository, categoryRepository, tagRepository)
                 )
                 EditTransactionScreen(
                     viewModel = viewModel,
@@ -217,7 +226,8 @@ fun MoneyTrackerNavGraph(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onCategoriesClick = { navController.navigate(Screen.Categories.route) }
+                    onCategoriesClick = { navController.navigate(Screen.Categories.route) },
+                    onTagsClick = { navController.navigate(Screen.Tags.route) }
                 )
             }
 
@@ -226,6 +236,26 @@ fun MoneyTrackerNavGraph(
                     factory = CategoriesViewModel.Factory(categoryRepository, transactionRepository)
                 )
                 CategoriesScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Tags.route) {
+                val viewModel: TagsViewModel = viewModel(
+                    factory = TagsViewModel.Factory(tagRepository, transactionRepository.transactionDao)
+                )
+                TagsScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Budget.route) {
+                val viewModel: BudgetViewModel = viewModel(
+                    factory = BudgetViewModel.Factory(budgetRepository, budgetPreallocationRepository, categoryBudgetRepository, categoryRepository, tagRepository)
+                )
+                BudgetScreen(
                     viewModel = viewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )

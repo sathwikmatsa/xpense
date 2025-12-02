@@ -6,7 +6,7 @@ import com.money.tracker.data.entity.Transaction
 import com.money.tracker.data.entity.TransactionType
 import kotlinx.coroutines.flow.Flow
 
-class TransactionRepository(private val transactionDao: TransactionDao) {
+class TransactionRepository(val transactionDao: TransactionDao) {
 
     val allTransactions: Flow<List<Transaction>> = transactionDao.getAllTransactions()
 

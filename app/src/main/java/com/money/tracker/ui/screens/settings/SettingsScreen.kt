@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Share
@@ -131,7 +132,8 @@ fun saveSharingApp(context: Context, app: AppInfo) {
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onCategoriesClick: () -> Unit
+    onCategoriesClick: () -> Unit,
+    onTagsClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -343,6 +345,14 @@ fun SettingsScreen(
                 title = "Categories",
                 subtitle = "Manage spending categories",
                 onClick = onCategoriesClick
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            SettingsItem(
+                icon = Icons.AutoMirrored.Filled.Label,
+                title = "Tags",
+                subtitle = "Manage tags for trips, events & contexts",
+                onClick = onTagsClick
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
