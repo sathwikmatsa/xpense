@@ -39,11 +39,8 @@ class CategoryRecommender {
     ): List<Category> {
         if (allCategories.isEmpty()) return emptyList()
 
-        // Only consider parent categories for recommendations
-        val parentCategories = allCategories.filter { it.parentId == null }
-
-        // Score each category
-        val scoredCategories = parentCategories.map { category ->
+        // Score all categories (parents and children)
+        val scoredCategories = allCategories.map { category ->
             val score = calculateScore(
                 category = category,
                 allCategories = allCategories,
@@ -65,8 +62,9 @@ class CategoryRecommender {
             .take(5)
             .map { it.category }
 
-        // Get remaining categories sorted alphabetically
+        // Get remaining parent categories sorted alphabetically (children shown via hierarchy in picker)
         val recommendedIds = recommendations.map { it.id }.toSet()
+        val parentCategories = allCategories.filter { it.parentId == null }
         val remaining = parentCategories
             .filter { it.id !in recommendedIds }
             .sortedBy { it.name.lowercase() }
@@ -88,11 +86,16 @@ class CategoryRecommender {
         var totalScore = 0.0
         var reason = ""
 
-        // Get all category IDs including children
-        val childIds = allCategories
-            .filter { it.parentId == category.id }
-            .map { it.id }
-        val categoryIds = setOf(category.id) + childIds
+        // For parent categories, include children in scoring
+        // For child categories, only score that specific category
+        val categoryIds = if (category.parentId == null) {
+            val childIds = allCategories
+                .filter { it.parentId == category.id }
+                .map { it.id }
+            setOf(category.id) + childIds
+        } else {
+            setOf(category.id)
+        }
 
         // Filter relevant transactions (same type, has category)
         val relevantTransactions = transactions.filter {

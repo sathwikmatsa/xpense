@@ -188,8 +188,8 @@ fun EditTransactionScreen(
             categories = categories,
             selectedCategory = selectedCategory,
             onCategorySelected = { selectedCategory = it },
-            onCreateCategory = { name, emoji ->
-                viewModel.createCategory(name, emoji)
+            onCreateCategory = { name, emoji, parentId ->
+                viewModel.createCategory(name, emoji, parentId)
             },
             onDismiss = { showCategoryPicker = false }
         )

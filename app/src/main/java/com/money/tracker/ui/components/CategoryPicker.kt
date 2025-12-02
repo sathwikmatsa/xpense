@@ -26,6 +26,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,24 +58,51 @@ fun CategoryPickerDialog(
     recommendedCategories: List<Category> = emptyList(),
     selectedCategory: Category?,
     onCategorySelected: (Category) -> Unit,
-    onCreateCategory: (name: String, emoji: String) -> Unit,
+    onCreateCategory: (name: String, emoji: String, parentId: Long?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    // Use recommended order if available and no search query
-    val orderedCategories = remember(searchQuery, categories, recommendedCategories) {
+    // Group categories by parent
+    val parentCategories = remember(categories) {
+        categories.filter { it.parentId == null }
+    }
+    val childrenByParent = remember(categories) {
+        categories.filter { it.parentId != null }.groupBy { it.parentId }
+    }
+
+    // Build flat list with parent-child ordering for display
+    val orderedCategories = remember(searchQuery, categories, recommendedCategories, parentCategories, childrenByParent) {
         if (searchQuery.isBlank()) {
             if (recommendedCategories.isNotEmpty()) {
-                recommendedCategories
+                // Recommendations are parent categories, show them first
+                // Then show all categories (parents with their children) alphabetically
+                val recommendedIds = recommendedCategories.map { it.id }.toSet()
+                val remaining = mutableListOf<Category>()
+                parentCategories.sortedBy { it.name.lowercase() }.forEach { parent ->
+                    if (parent.id !in recommendedIds) remaining.add(parent)
+                    childrenByParent[parent.id]?.sortedBy { it.name.lowercase() }?.forEach { child ->
+                        remaining.add(child)
+                    }
+                }
+                recommendedCategories + remaining
             } else {
-                categories.filter { it.parentId == null }.sortedBy { it.name.lowercase() }
+                // Show all categories with hierarchy (parent followed by children)
+                val result = mutableListOf<Category>()
+                parentCategories.sortedBy { it.name.lowercase() }.forEach { parent ->
+                    result.add(parent)
+                    childrenByParent[parent.id]?.sortedBy { it.name.lowercase() }?.forEach { child ->
+                        result.add(child)
+                    }
+                }
+                result
             }
         } else {
+            // Search across all categories (parents and children)
             categories.filter {
-                it.parentId == null && it.name.contains(searchQuery, ignoreCase = true)
-            }
+                it.name.contains(searchQuery, ignoreCase = true)
+            }.sortedBy { it.name.lowercase() }
         }
     }
 
@@ -82,8 +113,9 @@ fun CategoryPickerDialog(
 
     if (showCreateDialog) {
         CreateCategoryDialog(
-            onConfirm = { name, emoji ->
-                onCreateCategory(name, emoji)
+            parentCategories = parentCategories,
+            onConfirm = { name, emoji, parentId ->
+                onCreateCategory(name, emoji, parentId)
                 showCreateDialog = false
             },
             onDismiss = { showCreateDialog = false }
@@ -270,13 +302,19 @@ private fun CategoryItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateCategoryDialog(
-    onConfirm: (name: String, emoji: String) -> Unit,
+    parentCategories: List<Category> = emptyList(),
+    onConfirm: (name: String, emoji: String, parentId: Long?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("") }
+    var selectedParentId by remember { mutableStateOf<Long?>(null) }
+    var parentExpanded by remember { mutableStateOf(false) }
+
+    val selectedParent = parentCategories.find { it.id == selectedParentId }
 
     val commonEmojis = listOf(
         "🏷", "💼", "🎁", "✈", "🏥", "🎮", "📱", "💻",
@@ -351,11 +389,51 @@ fun CreateCategoryDialog(
                         }
                     }
                 }
+
+                // Parent category selector
+                if (parentCategories.isNotEmpty()) {
+                    ExposedDropdownMenuBox(
+                        expanded = parentExpanded,
+                        onExpandedChange = { parentExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedParent?.let { "${it.emoji} ${it.name}" } ?: "None (top-level)",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Parent Category") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = parentExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = parentExpanded,
+                            onDismissRequest = { parentExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None (top-level)") },
+                                onClick = {
+                                    selectedParentId = null
+                                    parentExpanded = false
+                                }
+                            )
+                            parentCategories.forEach { parent ->
+                                DropdownMenuItem(
+                                    text = { Text("${parent.emoji} ${parent.name}") },
+                                    onClick = {
+                                        selectedParentId = parent.id
+                                        parentExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name.trim(), emoji.ifBlank { "•" }) },
+                onClick = { onConfirm(name.trim(), emoji.ifBlank { "•" }, selectedParentId) },
                 enabled = name.isNotBlank()
             ) {
                 Text("Create")

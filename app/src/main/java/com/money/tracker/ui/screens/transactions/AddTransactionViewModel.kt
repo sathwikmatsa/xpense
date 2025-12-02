@@ -122,9 +122,9 @@ class AddTransactionViewModel(
         }
     }
 
-    fun createCategory(name: String, emoji: String) {
+    fun createCategory(name: String, emoji: String, parentId: Long? = null) {
         viewModelScope.launch {
-            categoryRepository.insert(Category(name = name, emoji = emoji))
+            categoryRepository.insert(Category(name = name, emoji = emoji, parentId = parentId))
         }
     }
 
