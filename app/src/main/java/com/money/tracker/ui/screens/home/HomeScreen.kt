@@ -91,10 +91,18 @@ import com.money.tracker.ui.theme.GradientEnd
 import com.money.tracker.ui.theme.GradientStart
 import com.money.tracker.ui.theme.IncomeGreen
 import com.money.tracker.ui.theme.WarningAmber
+import android.Manifest
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.view.accessibility.AccessibilityManager
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import com.money.tracker.service.UpiMonitorService
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -148,6 +156,24 @@ fun HomeScreen(
     // Count of pending items
     val pendingCount = uiState.pendingTransactions.size + uiState.upiReminders.size + uiState.unsyncedSplitTransactions.size
 
+    // Check permission states for settings badge
+    val context = LocalContext.current
+    val hasSmsPermission = remember {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+    }
+    val isUpiMonitorEnabled = remember {
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
+        enabledServices.any {
+            it.resolveInfo.serviceInfo.packageName == context.packageName &&
+            it.resolveInfo.serviceInfo.name == UpiMonitorService::class.java.name
+        }
+    }
+    val isNotificationListenerEnabled = remember {
+        NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+    }
+    val disabledPermissionsCount = listOf(!hasSmsPermission, !isUpiMonitorEnabled, !isNotificationListenerEnabled).count { it }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -182,8 +208,32 @@ fun HomeScreen(
                 },
                 actions = {
                     IconButton(onClick = onSettingsClick) {
-                        Box {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Box(
+                            modifier = Modifier.size(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                modifier = Modifier.size(26.dp)
+                            )
+                            if (disabledPermissionsCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(14.dp)
+                                        .background(ExpenseRed, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = disabledPermissionsCount.toString(),
+                                        color = Color.White,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        lineHeight = 9.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 },
