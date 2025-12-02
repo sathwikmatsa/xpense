@@ -402,10 +402,12 @@ fun TransactionsScreen(
                         }
                         items(transactions) { transaction ->
                             val category = uiState.categories[transaction.categoryId]
+                            val tag = transaction.tagId?.let { uiState.tags[it] }
                             if (category != null) {
                                 TransactionCard(
                                     transaction = transaction,
                                     category = category,
+                                    tag = tag,
                                     onClick = { onTransactionClick(transaction.id) }
                                 )
                             }
