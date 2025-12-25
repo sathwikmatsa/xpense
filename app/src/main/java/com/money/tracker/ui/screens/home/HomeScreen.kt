@@ -1133,12 +1133,12 @@ private fun UpiReminderCard(
 
 private fun getTimeDisplay(timestamp: Long): String {
     val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("d MMM", Locale.getDefault())
     val time = timeFormat.format(timestamp)
 
     val calNow = Calendar.getInstance()
     val calTimestamp = Calendar.getInstance().apply { timeInMillis = timestamp }
 
-    val daysDiff = ((calNow.timeInMillis - calTimestamp.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
     val isSameDay = calNow.get(Calendar.YEAR) == calTimestamp.get(Calendar.YEAR) &&
             calNow.get(Calendar.DAY_OF_YEAR) == calTimestamp.get(Calendar.DAY_OF_YEAR)
 
@@ -1149,7 +1149,7 @@ private fun getTimeDisplay(timestamp: Long): String {
     return when {
         isSameDay -> "Today, $time"
         isYesterday -> "Yesterday, $time"
-        else -> "$daysDiff days ago, $time"
+        else -> "${dateFormat.format(timestamp)}, $time"
     }
 }
 
