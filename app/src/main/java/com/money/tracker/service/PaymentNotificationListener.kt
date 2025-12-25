@@ -50,7 +50,10 @@ class PaymentNotificationListener : NotificationListenerService() {
         // Keywords to exclude (outgoing payments, promotions, etc.)
         private val EXCLUDE_KEYWORDS = listOf(
             "you sent", "you paid", "debited", "debit", "paid to", "pay now",
-            "offer", "cashback", "reward", "win", "scratch", "coupon", "discount"
+            "offer", "cashback", "reward", "win", "scratch", "coupon", "discount",
+            "earn", "unlock", "claim", "bonus", "expires", "limited time", "special",
+            "activate", "eligible", "congratulations", "you've won", "gift",
+            "loan", "pre-approved", "credit limit", "emi", "interest rate"
         )
 
         // Pattern to extract sender name
