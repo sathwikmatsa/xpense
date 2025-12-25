@@ -63,5 +63,6 @@ enum class TransactionSource {
     PAYPAL,
     CASH,
     AUTO_DEBIT,
+    SPLITWISE,
     OTHER
 }

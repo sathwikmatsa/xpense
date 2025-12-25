@@ -130,15 +130,28 @@ class HomeViewModel(
         val preallocatedBudget = preallocations.sumOf { it.amount }
         val preallocatedCategoryIds = preallocations.map { it.categoryId }.toSet()
 
+        // Find categories excluded from expense calculations (like Settlement)
+        val categoriesMap = categories.associateBy { it.id }
+        val excludedCategoryIds = categories.filter { it.excludeFromExpense }.map { it.id }.toSet()
+
         // Calculate discretionary vs preallocated expenses from transactions
+        // Exclude transactions in categories marked as excludeFromExpense
         val confirmedTransactions = transactions.filter { !it.isPending }
         val discretionaryExpense = confirmedTransactions
             .filter { it.categoryId == null || it.categoryId !in preallocatedCategoryIds }
             .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+            .filter { it.categoryId == null || it.categoryId !in excludedCategoryIds }
             .sumOf { it.amount }
         val preallocatedExpense = confirmedTransactions
             .filter { it.categoryId != null && it.categoryId in preallocatedCategoryIds }
             .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+            .filter { it.categoryId !in excludedCategoryIds }
+            .sumOf { it.amount }
+
+        // Calculate total expense excluding excluded categories
+        val totalExpenseExcluded = confirmedTransactions
+            .filter { it.type == com.money.tracker.data.entity.TransactionType.EXPENSE }
+            .filter { it.categoryId == null || it.categoryId !in excludedCategoryIds }
             .sumOf { it.amount }
 
         HomeUiState(
@@ -146,9 +159,9 @@ class HomeViewModel(
             pendingTransactions = pendingTransactions,
             unsyncedSplitTransactions = emptyList(), // Will be populated separately
             upiReminders = upiReminders,
-            categories = categories.associateBy { it.id },
+            categories = categoriesMap,
             totalIncome = income ?: 0.0,
-            totalExpense = expense ?: 0.0,
+            totalExpense = totalExpenseExcluded, // Use calculated expense excluding Settlement
             paidForOthers = paidForOthers,
             budget = budget?.amount,
             preallocations = preallocations,

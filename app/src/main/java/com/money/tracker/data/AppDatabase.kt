@@ -29,7 +29,7 @@ import androidx.room.migration.Migration
 
 @Database(
     entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class, Tag::class, TagBudget::class],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -192,6 +192,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 11 to 12: Add excludeFromExpense to categories and Settlement category
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add excludeFromExpense column to categories
+                db.execSQL("ALTER TABLE categories ADD COLUMN excludeFromExpense INTEGER NOT NULL DEFAULT 0")
+
+                // Insert Settlement category
+                db.execSQL("INSERT INTO categories (name, emoji, parentId, isDefault, preallocatedBudget, excludeFromExpense) VALUES ('Settlement', '🤝', NULL, 1, 0, 1)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -199,7 +210,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "money_tracker_db"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
@@ -218,8 +229,8 @@ abstract class AppDatabase : RoomDatabase() {
                         private fun insertDefaultCategories(db: SupportSQLiteDatabase) {
                             DefaultCategories.list.forEach { category ->
                                 db.execSQL(
-                                    "INSERT INTO categories (name, emoji, parentId, isDefault) VALUES (?, ?, ?, ?)",
-                                    arrayOf(category.name, category.emoji, category.parentId, if (category.isDefault) 1 else 0)
+                                    "INSERT INTO categories (name, emoji, parentId, isDefault, excludeFromExpense) VALUES (?, ?, ?, ?, ?)",
+                                    arrayOf(category.name, category.emoji, category.parentId, if (category.isDefault) 1 else 0, if (category.excludeFromExpense) 1 else 0)
                                 )
                             }
                         }

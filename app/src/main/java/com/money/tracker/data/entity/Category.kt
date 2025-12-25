@@ -25,7 +25,8 @@ data class Category(
     val parentId: Long? = null,
     val isDefault: Boolean = false,
     @Deprecated("Use BudgetPreallocation table instead")
-    val preallocatedBudget: Double = 0.0 // Kept for DB compatibility, not used
+    val preallocatedBudget: Double = 0.0, // Kept for DB compatibility, not used
+    val excludeFromExpense: Boolean = false // For categories like Settlement that shouldn't count as expense
 )
 
 object DefaultCategories {
@@ -42,6 +43,7 @@ object DefaultCategories {
         Category(name = "Investment", emoji = "📈", isDefault = true),
         Category(name = "Rent", emoji = "🏠", isDefault = true),
         Category(name = "Transfer", emoji = "↔", isDefault = true),
+        Category(name = "Settlement", emoji = "🤝", isDefault = true, excludeFromExpense = true),
         Category(name = "Other", emoji = "•", isDefault = true)
     )
 }
