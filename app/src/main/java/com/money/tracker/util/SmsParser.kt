@@ -30,7 +30,7 @@ object SmsParser {
     private val debitKeywords = listOf(
         "debited", "debit", "spent", "paid", "payment", "purchase",
         "withdrawn", "withdrawal", "sent", "transfer to", "txn",
-        "one-time password for inr", "otp for inr", "otp for txn" // OTP-based transaction detection
+        "successfully executed" // Auto-debit mandate execution
     )
 
     private val creditKeywords = listOf(
@@ -42,9 +42,12 @@ object SmsParser {
     private val excludeKeywords = listOf(
         "amt due", "amount due", "due date", "bill due", "pay now", "pay by",
         "minimum due", "min due", "total due", "outstanding", "overdue",
-        "reminder", "otp is", "otp:", "one time password", "verification code",
+        "payment due", "will be processed", // Upcoming auto-debit reminders
+        "reminder", "otp is", "otp:", "one time password", "one-time password", "verification code",
         "offer", "cashback offer", "reward", "win", "earn", "avail",
-        "emi available", "convert to emi", "pre-approved", "limit increased"
+        "emi available", "convert to emi", "pre-approved", "limit increased",
+        "credited to your card", "credited to your credit card", // Credit card payment confirmations
+        "upgrade now", "recharge now", "buy now", "book now", "apply now" // Promotional CTAs
     )
 
     private val upiPatterns = listOf(
