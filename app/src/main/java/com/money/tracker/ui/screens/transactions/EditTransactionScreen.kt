@@ -100,6 +100,7 @@ fun EditTransactionScreen(
     var selectedTag by remember { mutableStateOf<Tag?>(null) }
     var selectedSource by remember { mutableStateOf(TransactionSource.UPI) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var selectedExpenseDate by remember { mutableStateOf<Long?>(null) }
     var initialized by remember { mutableStateOf(false) }
 
     // Split transaction state
@@ -115,6 +116,7 @@ fun EditTransactionScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showExpenseDatePicker by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -136,6 +138,7 @@ fun EditTransactionScreen(
             selectedType = txn.type
             selectedSource = txn.source
             selectedDateTime = txn.date
+            selectedExpenseDate = txn.expenseDate
             // Initialize split state
             isSplit = txn.isSplit
             if (txn.isSplit) {
@@ -300,6 +303,40 @@ fun EditTransactionScreen(
         }
     }
 
+    if (showExpenseDatePicker) {
+        val expenseDatePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedExpenseDate ?: selectedDateTime
+        )
+        DatePickerDialog(
+            onDismissRequest = { showExpenseDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedExpenseDate = expenseDatePickerState.selectedDateMillis
+                    showExpenseDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (selectedExpenseDate != null) {
+                        TextButton(onClick = {
+                            selectedExpenseDate = null
+                            showExpenseDatePicker = false
+                        }) {
+                            Text("Clear")
+                        }
+                    }
+                    TextButton(onClick = { showExpenseDatePicker = false }) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        ) {
+            DatePicker(state = expenseDatePickerState)
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -353,6 +390,7 @@ fun EditTransactionScreen(
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
                                 date = selectedDateTime,
+                                expenseDate = selectedExpenseDate,
                                 tagId = selectedTag?.id,
                                 isSplit = isSplit,
                                 splitNumerator = selectedSplitShare.numerator,
@@ -590,6 +628,32 @@ fun EditTransactionScreen(
                                 .clickable { showTimePicker = true }
                         )
                     }
+                }
+
+                // Expense Date (optional - for budget attribution)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = if (selectedExpenseDate != null) {
+                            dateFormat.format(Date(selectedExpenseDate!!))
+                        } else {
+                            "Same as payment date"
+                        },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Expense Date (for budget)") },
+                        trailingIcon = {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = "Select expense date")
+                        },
+                        supportingText = {
+                            Text("When this expense should count in your budget")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showExpenseDatePicker = true }
+                    )
                 }
 
                 // Category Picker

@@ -34,6 +34,11 @@ class TransactionRepository(val transactionDao: TransactionDao) {
         return transactionDao.getTransactionsBetween(startDate, endDate)
     }
 
+    // Get transactions by expense date (for budgets/charts)
+    fun getTransactionsByExpenseDateBetween(startDate: Long, endDate: Long): Flow<List<Transaction>> {
+        return transactionDao.getTransactionsByExpenseDateBetween(startDate, endDate)
+    }
+
     fun getByType(type: TransactionType): Flow<List<Transaction>> {
         return transactionDao.getByType(type)
     }

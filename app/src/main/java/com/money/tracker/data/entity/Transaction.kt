@@ -21,7 +21,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.SET_NULL
         )
     ],
-    indices = [Index("categoryId"), Index("date"), Index("tagId")]
+    indices = [Index("categoryId"), Index("date"), Index("tagId"), Index("expenseDate")]
 )
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
@@ -33,7 +33,8 @@ data class Transaction(
     val categoryId: Long? = null,
     val tagId: Long? = null, // Optional contextual tag (e.g., Travel, Holiday)
     val source: TransactionSource,
-    val date: Long, // epoch millis
+    val date: Long, // epoch millis - when payment was made
+    val expenseDate: Long? = null, // epoch millis - when expense should count (for budgets/charts), defaults to date if null
     val rawMessage: String? = null, // original SMS/email for reference
     val isManual: Boolean = false,
     val isPending: Boolean = false, // true for SMS-detected transactions awaiting confirmation

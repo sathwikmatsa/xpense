@@ -96,7 +96,7 @@ class HomeViewModel(
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
-        transactionRepository.getTransactionsBetween(startOfMonth, endOfMonth),
+        transactionRepository.getTransactionsByExpenseDateBetween(startOfMonth, endOfMonth), // Use expense date for budget view
         categoryRepository.allCategories,
         transactionRepository.getTotalIncome(startOfMonth, endOfMonth),
         transactionRepository.getTotalExpense(startOfMonth, endOfMonth),

@@ -29,7 +29,7 @@ import androidx.room.migration.Migration
 
 @Database(
     entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class, Tag::class, TagBudget::class],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -203,6 +203,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 12 to 13: Add expenseDate to transactions
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add expenseDate column (nullable, defaults to null which means use date)
+                db.execSQL("ALTER TABLE transactions ADD COLUMN expenseDate INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_expenseDate ON transactions(expenseDate)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -210,7 +219,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "money_tracker_db"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

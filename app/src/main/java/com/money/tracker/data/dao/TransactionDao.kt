@@ -31,19 +31,23 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE date BETWEEN :startDate AND :endDate ORDER BY date DESC")
     fun getTransactionsBetween(startDate: Long, endDate: Long): Flow<List<Transaction>>
 
+    // Get transactions by expense date (for budgets/charts) - uses expenseDate if set, otherwise date
+    @Query("SELECT * FROM transactions WHERE COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate ORDER BY COALESCE(expenseDate, date) DESC")
+    fun getTransactionsByExpenseDateBetween(startDate: Long, endDate: Long): Flow<List<Transaction>>
+
     @Query("SELECT * FROM transactions WHERE type = :type ORDER BY date DESC")
     fun getByType(type: TransactionType): Flow<List<Transaction>>
 
     @Query("SELECT * FROM transactions WHERE categoryId = :categoryId ORDER BY date DESC")
     fun getByCategory(categoryId: Long): Flow<List<Transaction>>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0")
+    @Query("SELECT SUM(amount) FROM transactions WHERE type = :type AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0")
     fun getTotalByType(type: TransactionType, startDate: Long, endDate: Long): Flow<Double?>
 
     @Query("""
         SELECT categoryId, SUM(amount) as total
         FROM transactions
-        WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        WHERE type = :type AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0
         GROUP BY categoryId
     """)
     fun getCategoryTotals(type: TransactionType, startDate: Long, endDate: Long): Flow<List<CategoryTotal>>
@@ -102,7 +106,7 @@ interface TransactionDao {
     // Get expenses excluding preallocated categories (for discretionary budget tracking)
     @Query("""
         SELECT SUM(amount) FROM transactions
-        WHERE type = 'EXPENSE' AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        WHERE type = 'EXPENSE' AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0
         AND (categoryId IS NULL OR categoryId NOT IN (:preallocatedCategoryIds))
     """)
     fun getDiscretionaryExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?>
@@ -110,7 +114,7 @@ interface TransactionDao {
     // Get expenses in preallocated categories
     @Query("""
         SELECT SUM(amount) FROM transactions
-        WHERE type = 'EXPENSE' AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        WHERE type = 'EXPENSE' AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0
         AND categoryId IN (:preallocatedCategoryIds)
     """)
     fun getPreallocatedExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?>
@@ -131,7 +135,7 @@ interface TransactionDao {
     @Query("""
         SELECT tagId, SUM(amount) as total
         FROM transactions
-        WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0
+        WHERE type = :type AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0
         GROUP BY tagId
     """)
     fun getTagTotals(type: TransactionType, startDate: Long, endDate: Long): Flow<List<TagTotal>>
@@ -139,7 +143,7 @@ interface TransactionDao {
     @Query("""
         SELECT categoryId, SUM(amount) as total
         FROM transactions
-        WHERE type = :type AND date BETWEEN :startDate AND :endDate AND isPending = 0 AND tagId = :tagId
+        WHERE type = :type AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0 AND tagId = :tagId
         GROUP BY categoryId
     """)
     fun getCategoryTotalsForTag(type: TransactionType, startDate: Long, endDate: Long, tagId: Long): Flow<List<CategoryTotal>>

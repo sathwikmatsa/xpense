@@ -144,7 +144,7 @@ class AnalyticsViewModel(
             val monthStart = calStart.timeInMillis
 
             val paidForOthers = transactions
-                .filter { it.isSplit && !it.isPending && it.date in monthStart..monthEnd }
+                .filter { it.isSplit && !it.isPending && (it.expenseDate ?: it.date) in monthStart..monthEnd }
                 .sumOf { it.totalAmount - it.amount }
 
             val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
@@ -274,7 +274,7 @@ class AnalyticsViewModel(
         combine(
             transactionRepository.getCategoryTotals(TransactionType.EXPENSE, startTime, endTime),
             categoryRepository.allCategories,
-            transactionRepository.getTransactionsBetween(startTime, endTime),
+            transactionRepository.getTransactionsByExpenseDateBetween(startTime, endTime),
             tagRepository.allTags
         ) { categoryTotals, categories, transactions, tags ->
             // Build expanded excluded categories (include children of excluded parents)
@@ -395,7 +395,7 @@ class AnalyticsViewModel(
             expanded
         }
 
-        transactionRepository.getTransactionsBetween(startTime, endTime).combine(
+        transactionRepository.getTransactionsByExpenseDateBetween(startTime, endTime).combine(
             kotlinx.coroutines.flow.flowOf(Unit)
         ) { transactions, _ ->
             val filteredTransactions = transactions.filter { txn ->
@@ -433,6 +433,9 @@ class AnalyticsViewModel(
         timeRange: TrendTimeRange,
         startTime: Long
     ): List<DailySpending> {
+        // Helper to get effective expense date (expenseDate if set, otherwise date)
+        fun Transaction.effectiveDate() = expenseDate ?: date
+
         return when (timeRange) {
             TrendTimeRange.WEEK -> {
                 // 7 individual days (including today)
@@ -454,7 +457,7 @@ class AnalyticsViewModel(
                     calendarEnd.set(Calendar.MILLISECOND, 999)
                     val dayEnd = calendarEnd.timeInMillis
 
-                    val amount = transactions.filter { it.date in dayStart..dayEnd }
+                    val amount = transactions.filter { it.effectiveDate() in dayStart..dayEnd }
                         .sumOf { it.amount }
 
                     val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
@@ -486,7 +489,7 @@ class AnalyticsViewModel(
                     calendarEnd.set(Calendar.MILLISECOND, 999)
                     val weekEnd = calendarEnd.timeInMillis
 
-                    val amount = transactions.filter { it.date in weekStart..weekEnd }
+                    val amount = transactions.filter { it.effectiveDate() in weekStart..weekEnd }
                         .sumOf { it.amount }
 
                     val weekFormat = SimpleDateFormat("d MMM", Locale.getDefault())
@@ -520,7 +523,7 @@ class AnalyticsViewModel(
                     calendarEnd.set(Calendar.MILLISECOND, 999)
                     val monthEnd = calendarEnd.timeInMillis
 
-                    val amount = transactions.filter { it.date in monthStart..monthEnd }
+                    val amount = transactions.filter { it.effectiveDate() in monthStart..monthEnd }
                         .sumOf { it.amount }
 
                     val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
@@ -554,7 +557,7 @@ class AnalyticsViewModel(
                     calendarEnd.set(Calendar.MILLISECOND, 999)
                     val monthEnd = calendarEnd.timeInMillis
 
-                    val amount = transactions.filter { it.date in monthStart..monthEnd }
+                    val amount = transactions.filter { it.effectiveDate() in monthStart..monthEnd }
                         .sumOf { it.amount }
 
                     val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
@@ -588,7 +591,7 @@ class AnalyticsViewModel(
                     calendarEnd.set(Calendar.MILLISECOND, 999)
                     val monthEnd = calendarEnd.timeInMillis
 
-                    val amount = transactions.filter { it.date in monthStart..monthEnd }
+                    val amount = transactions.filter { it.effectiveDate() in monthStart..monthEnd }
                         .sumOf { it.amount }
 
                     val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())

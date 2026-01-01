@@ -108,6 +108,7 @@ fun AddTransactionScreen(
     var selectedTag by remember { mutableStateOf<Tag?>(null) }
     var selectedSource by remember { mutableStateOf(initialSource) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var selectedExpenseDate by remember { mutableStateOf<Long?>(null) }
 
     // Split transaction state
     var isSplit by remember { mutableStateOf(false) }
@@ -119,6 +120,7 @@ fun AddTransactionScreen(
     var sourceExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showExpenseDatePicker by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -248,6 +250,40 @@ fun AddTransactionScreen(
         }
     }
 
+    if (showExpenseDatePicker) {
+        val expenseDatePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedExpenseDate ?: selectedDateTime
+        )
+        DatePickerDialog(
+            onDismissRequest = { showExpenseDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedExpenseDate = expenseDatePickerState.selectedDateMillis
+                    showExpenseDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (selectedExpenseDate != null) {
+                        TextButton(onClick = {
+                            selectedExpenseDate = null
+                            showExpenseDatePicker = false
+                        }) {
+                            Text("Clear")
+                        }
+                    }
+                    TextButton(onClick = { showExpenseDatePicker = false }) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        ) {
+            DatePicker(state = expenseDatePickerState)
+        }
+    }
+
     // Validation function
     fun validateAndGetAmount(): Double? {
         val amountValue = amount.toDoubleOrNull()
@@ -292,6 +328,7 @@ fun AddTransactionScreen(
                             categoryId = selectedCategory!!.id,
                             source = selectedSource,
                             date = selectedDateTime,
+                            expenseDate = selectedExpenseDate,
                             tagId = selectedTag?.id
                         )
                         onSaved()
@@ -508,6 +545,32 @@ fun AddTransactionScreen(
                 }
             }
 
+            // Expense Date (optional - for budget attribution)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = if (selectedExpenseDate != null) {
+                        dateFormat.format(Date(selectedExpenseDate!!))
+                    } else {
+                        "Same as payment date"
+                    },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Expense Date (for budget)") },
+                    trailingIcon = {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Select expense date")
+                    },
+                    supportingText = {
+                        Text("When this expense should count in your budget")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showExpenseDatePicker = true }
+                )
+            }
+
             // Category Picker
             Text(
                 text = "Category",
@@ -657,6 +720,7 @@ fun AddTransactionScreen(
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
                                 date = selectedDateTime,
+                                expenseDate = selectedExpenseDate,
                                 tagId = selectedTag?.id,
                                 isSplit = true,
                                 splitNumerator = selectedSplitShare.numerator,
@@ -694,6 +758,7 @@ fun AddTransactionScreen(
                                 categoryId = selectedCategory!!.id,
                                 source = selectedSource,
                                 date = selectedDateTime,
+                                expenseDate = selectedExpenseDate,
                                 tagId = selectedTag?.id,
                                 isSplit = true,
                                 splitNumerator = selectedSplitShare.numerator,
