@@ -43,7 +43,7 @@ object SmsParser {
         "amt due", "amount due", "due date", "bill due", "pay now", "pay by",
         "minimum due", "min due", "total due", "outstanding", "overdue",
         "payment due", "will be processed", // Upcoming auto-debit reminders
-        "reminder", "otp is", "otp:", "one time password", "one-time password", "verification code",
+        "reminder", "otp is", "is otp", "otp for", "otp:", "one time password", "one-time password", "verification code", "do not share",
         "offer", "cashback offer", "reward", "win", "earn", "avail",
         "emi available", "convert to emi", "pre-approved", "limit increased",
         "credited to your card", "credited to your credit card", // Credit card payment confirmations
