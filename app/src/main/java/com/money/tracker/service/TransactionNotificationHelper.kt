@@ -17,6 +17,7 @@ object TransactionNotificationHelper {
 
     private const val CHANNEL_ID = "transaction_detected"
     private const val CHANNEL_NAME = "Transaction Detected"
+    private const val MAX_NOTIFICATIONS = 3
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -97,7 +98,22 @@ object TransactionNotificationHelper {
             .build()
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
+        enforceMaxNotifications(notificationManager)
         notificationManager.notify(transactionId.toInt(), notification)
+    }
+
+    private fun enforceMaxNotifications(notificationManager: NotificationManager) {
+        val activeNotifications = notificationManager.activeNotifications
+            .filter { it.notification.channelId == CHANNEL_ID }
+            .sortedBy { it.postTime }
+
+        // Cancel oldest notifications to keep max 3 (including the one we're about to add)
+        val toRemove = activeNotifications.size - (MAX_NOTIFICATIONS - 1)
+        if (toRemove > 0) {
+            activeNotifications.take(toRemove).forEach {
+                notificationManager.cancel(it.id)
+            }
+        }
     }
 
     fun cancelNotification(context: Context, transactionId: Long) {
@@ -144,6 +160,7 @@ object TransactionNotificationHelper {
             .build()
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
+        enforceMaxNotifications(notificationManager)
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
 
@@ -186,6 +203,7 @@ object TransactionNotificationHelper {
             .build()
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
+        enforceMaxNotifications(notificationManager)
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
 }
