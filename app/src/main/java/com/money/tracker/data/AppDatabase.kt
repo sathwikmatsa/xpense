@@ -238,7 +238,7 @@ abstract class AppDatabase : RoomDatabase() {
                         private fun insertDefaultCategories(db: SupportSQLiteDatabase) {
                             DefaultCategories.list.forEach { category ->
                                 db.execSQL(
-                                    "INSERT INTO categories (name, emoji, parentId, isDefault, excludeFromExpense) VALUES (?, ?, ?, ?, ?)",
+                                    "INSERT INTO categories (name, emoji, parentId, isDefault, preallocatedBudget, excludeFromExpense) VALUES (?, ?, ?, ?, 0, ?)",
                                     arrayOf(category.name, category.emoji, category.parentId, if (category.isDefault) 1 else 0, if (category.excludeFromExpense) 1 else 0)
                                 )
                             }
