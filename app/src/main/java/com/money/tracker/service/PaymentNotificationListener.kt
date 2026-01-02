@@ -54,7 +54,8 @@ class PaymentNotificationListener : NotificationListenerService() {
             "earn", "unlock", "claim", "bonus", "expires", "limited time", "special",
             "activate", "eligible", "congratulations", "you've won", "gift",
             "loan", "pre-approved", "credit limit", "emi", "interest rate",
-            "voucher", "bills pending", "top up", "we've got you", "get a"
+            "voucher", "bills pending", "top up", "we've got you", "get a",
+            "bill from", "your bill", "use jewels", "save ₹", "save rs"
         )
 
         // Pattern to extract sender name
