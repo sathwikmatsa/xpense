@@ -189,15 +189,17 @@ class PaymentNotificationListener : NotificationListenerService() {
             return
         }
 
-        // Extract expense info: "Expense Name (₹Total)" and "You owe ₹Share"
-        val expenseInfo = extractSplitwiseExpenseInfo(text.ifBlank { tickerText })
+        // Extract expense info from title (format: "Expense Name (₹Total)")
+        // Title has the expense name and total, text has "You owe ₹Share"
+        val expenseInfo = extractSplitwiseExpenseInfo(title) ?: extractSplitwiseExpenseInfo(tickerText)
         if (expenseInfo == null) {
             Log.d(TAG, "Could not extract expense info from Splitwise notification")
             return
         }
 
         val (expenseName, totalAmount) = expenseInfo
-        val shareAmount = extractYouOweAmount(fullText)
+        // Extract share amount from text (e.g., "– You owe ₹200.50") or fullText
+        val shareAmount = extractYouOweAmount(text) ?: extractYouOweAmount(fullText)
 
         // Check if we've already processed this expense
         val normalizedName = expenseName.lowercase().trim()

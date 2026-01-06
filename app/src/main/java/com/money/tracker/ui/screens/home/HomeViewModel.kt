@@ -122,8 +122,9 @@ class HomeViewModel(
         val preallocations = values[8] as List<BudgetPreallocation>
 
         // Calculate paid for others from split transactions
+        // Only count transactions where YOU paid (not Splitwise where someone else paid)
         val paidForOthers = transactions
-            .filter { it.isSplit && !it.isPending }
+            .filter { it.isSplit && !it.isPending && it.source != com.money.tracker.data.entity.TransactionSource.SPLITWISE }
             .sumOf { it.totalAmount - it.amount }
 
         // Calculate preallocated budget total from monthly preallocations

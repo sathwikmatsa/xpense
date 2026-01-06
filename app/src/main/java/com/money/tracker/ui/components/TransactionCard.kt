@@ -96,7 +96,8 @@ fun TransactionCard(
                         text = "${category.name} • ${dateFormat.format(Date(transaction.date))}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     // Tag indicator
                     if (tag != null) {

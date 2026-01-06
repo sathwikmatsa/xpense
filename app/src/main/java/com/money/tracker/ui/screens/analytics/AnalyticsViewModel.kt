@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.money.tracker.data.entity.Category
 import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.Transaction
+import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.data.repository.CategoryRepository
 import com.money.tracker.data.repository.TagRepository
@@ -144,7 +145,7 @@ class AnalyticsViewModel(
             val monthStart = calStart.timeInMillis
 
             val paidForOthers = transactions
-                .filter { it.isSplit && !it.isPending && (it.expenseDate ?: it.date) in monthStart..monthEnd }
+                .filter { it.isSplit && !it.isPending && it.source != TransactionSource.SPLITWISE && (it.expenseDate ?: it.date) in monthStart..monthEnd }
                 .sumOf { it.totalAmount - it.amount }
 
             val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
@@ -169,7 +170,7 @@ class AnalyticsViewModel(
         }.timeInMillis
 
         val splitTransactions = transactions.filter {
-            it.isSplit && !it.isPending && it.date >= sixMonthsAgo
+            it.isSplit && !it.isPending && it.source != TransactionSource.SPLITWISE && it.date >= sixMonthsAgo
         }
 
         val categoryMap = categories.associateBy { it.id }
