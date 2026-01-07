@@ -268,7 +268,8 @@ fun HomeScreen(
                         BudgetInsights(
                             budget = trackingBudget,
                             totalExpense = trackingExpense,
-                            paidForOthers = uiState.paidForOthers,
+                            paidForOthersTotal = uiState.paidForOthersTotal,
+                            paidForOthersSettled = uiState.paidForOthersSettled,
                             daysRemaining = daysRemaining,
                             daysPassed = daysPassed,
                             daysInMonth = daysInMonth,
@@ -279,10 +280,11 @@ fun HomeScreen(
                 }
 
                 // Paid for Others card (when no budget but has split transactions)
-                if (uiState.budget == null && uiState.paidForOthers > 0) {
+                if (uiState.budget == null && uiState.paidForOthersTotal > 0) {
                     item {
                         PaidForOthersCard(
-                            amount = uiState.paidForOthers,
+                            total = uiState.paidForOthersTotal,
+                            settled = uiState.paidForOthersSettled,
                             currencyFormat = currencyFormat
                         )
                     }
@@ -690,7 +692,8 @@ private fun BudgetCard(
 private fun BudgetInsights(
     budget: Double,
     totalExpense: Double,
-    paidForOthers: Double,
+    paidForOthersTotal: Double,
+    paidForOthersSettled: Double,
     daysRemaining: Int,
     daysPassed: Int,
     daysInMonth: Int,
@@ -740,9 +743,10 @@ private fun BudgetInsights(
         }
 
         // Paid for Others (only show if > 0)
-        if (paidForOthers > 0) {
+        if (paidForOthersTotal > 0) {
             PaidForOthersCard(
-                amount = paidForOthers,
+                total = paidForOthersTotal,
+                settled = paidForOthersSettled,
                 currencyFormat = currencyFormat
             )
         }
@@ -751,7 +755,8 @@ private fun BudgetInsights(
 
 @Composable
 private fun PaidForOthersCard(
-    amount: Double,
+    total: Double,
+    settled: Double,
     currencyFormat: NumberFormat
 ) {
     Card(
@@ -761,32 +766,58 @@ private fun PaidForOthersCard(
             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Column {
+            Text(
+                text = "Paid for Others (This Month)",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Total paid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Paid for Others",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Paid",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = currencyFormat.format(amount),
+                    text = currencyFormat.format(total),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.secondary
                 )
             }
-            Text(
-                text = "This month",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
+            // Settled
+            if (settled > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Received Back",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = currencyFormat.format(settled),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
         }
     }
 }

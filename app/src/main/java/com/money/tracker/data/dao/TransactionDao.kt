@@ -41,14 +41,26 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE categoryId = :categoryId ORDER BY date DESC")
     fun getByCategory(categoryId: Long): Flow<List<Transaction>>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE type = :type AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0")
+    @Query("""
+        SELECT SUM(t.amount)
+        FROM transactions t
+        LEFT JOIN categories c ON t.categoryId = c.id
+        WHERE t.type = :type
+        AND COALESCE(t.expenseDate, t.date) BETWEEN :startDate AND :endDate
+        AND t.isPending = 0
+        AND (c.excludeFromExpense = 0 OR c.excludeFromExpense IS NULL)
+    """)
     fun getTotalByType(type: TransactionType, startDate: Long, endDate: Long): Flow<Double?>
 
     @Query("""
-        SELECT categoryId, SUM(amount) as total
-        FROM transactions
-        WHERE type = :type AND COALESCE(expenseDate, date) BETWEEN :startDate AND :endDate AND isPending = 0
-        GROUP BY categoryId
+        SELECT t.categoryId, SUM(t.amount) as total
+        FROM transactions t
+        LEFT JOIN categories c ON t.categoryId = c.id
+        WHERE t.type = :type
+        AND COALESCE(t.expenseDate, t.date) BETWEEN :startDate AND :endDate
+        AND t.isPending = 0
+        AND (c.excludeFromExpense = 0 OR c.excludeFromExpense IS NULL)
+        GROUP BY t.categoryId
     """)
     fun getCategoryTotals(type: TransactionType, startDate: Long, endDate: Long): Flow<List<CategoryTotal>>
 

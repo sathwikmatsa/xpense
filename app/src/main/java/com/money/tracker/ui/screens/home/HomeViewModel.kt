@@ -48,7 +48,8 @@ data class HomeUiState(
     val tags: Map<Long, Tag> = emptyMap(),
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
-    val paidForOthers: Double = 0.0,
+    val paidForOthersTotal: Double = 0.0,
+    val paidForOthersSettled: Double = 0.0,
     val budget: Double? = null,
     val preallocations: List<BudgetPreallocation> = emptyList(),
     val preallocatedBudget: Double = 0.0,
@@ -121,19 +122,29 @@ class HomeViewModel(
         @Suppress("UNCHECKED_CAST")
         val preallocations = values[8] as List<BudgetPreallocation>
 
+        // Find categories excluded from expense calculations (like Settlement)
+        val categoriesMap = categories.associateBy { it.id }
+        val excludedCategoryIds = categories.filter { it.excludeFromExpense }.map { it.id }.toSet()
+
         // Calculate paid for others from split transactions
         // Only count transactions where YOU paid (not Splitwise where someone else paid)
-        val paidForOthers = transactions
+        val paidForOthersTotal = transactions
             .filter { it.isSplit && !it.isPending && it.source != com.money.tracker.data.entity.TransactionSource.SPLITWISE }
             .sumOf { it.totalAmount - it.amount }
+
+        // Calculate settled amount from Settlement income transactions
+        val settlementCategoryId = categories.find { it.name == "Settlement" && it.excludeFromExpense }?.id
+        val paidForOthersSettled = if (settlementCategoryId != null) {
+            transactions
+                .filter { it.categoryId == settlementCategoryId && it.type == com.money.tracker.data.entity.TransactionType.INCOME && !it.isPending }
+                .sumOf { it.amount }
+        } else {
+            0.0
+        }
 
         // Calculate preallocated budget total from monthly preallocations
         val preallocatedBudget = preallocations.sumOf { it.amount }
         val preallocatedCategoryIds = preallocations.map { it.categoryId }.toSet()
-
-        // Find categories excluded from expense calculations (like Settlement)
-        val categoriesMap = categories.associateBy { it.id }
-        val excludedCategoryIds = categories.filter { it.excludeFromExpense }.map { it.id }.toSet()
 
         // Calculate discretionary vs preallocated expenses from transactions
         // Exclude transactions in categories marked as excludeFromExpense
@@ -163,7 +174,8 @@ class HomeViewModel(
             categories = categoriesMap,
             totalIncome = income ?: 0.0,
             totalExpense = totalExpenseExcluded, // Use calculated expense excluding Settlement
-            paidForOthers = paidForOthers,
+            paidForOthersTotal = paidForOthersTotal,
+            paidForOthersSettled = paidForOthersSettled,
             budget = budget?.amount,
             preallocations = preallocations,
             preallocatedBudget = preallocatedBudget,
