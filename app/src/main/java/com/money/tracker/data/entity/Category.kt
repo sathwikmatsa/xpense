@@ -44,6 +44,7 @@ object DefaultCategories {
         Category(name = "Rent", emoji = "🏠", isDefault = true),
         Category(name = "Transfer", emoji = "↔", isDefault = true),
         Category(name = "Settlement", emoji = "🤝", isDefault = true, excludeFromExpense = true),
+        Category(name = "Credit Card Bill", emoji = "💳", isDefault = true, excludeFromExpense = true),
         Category(name = "Other", emoji = "•", isDefault = true)
     )
 }

@@ -31,7 +31,7 @@ import androidx.room.migration.Migration
 
 @Database(
     entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class, Tag::class, TagBudget::class, TransactionTag::class],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -239,6 +239,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add "Credit Card Bill" category with excludeFromExpense = true
+                db.execSQL("""
+                    INSERT INTO categories (name, emoji, parentId, isDefault, preallocatedBudget, excludeFromExpense)
+                    VALUES ('Credit Card Bill', '💳', NULL, 1, 0, 1)
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -246,7 +256,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "money_tracker_db"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
