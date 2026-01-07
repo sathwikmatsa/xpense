@@ -453,3 +453,208 @@ fun TagChip(
         }
     }
 }
+
+@Composable
+fun MultiTagPickerDialog(
+    tags: List<Tag>,
+    selectedTagIds: Set<Long>,
+    onTagsSelected: (Set<Long>) -> Unit,
+    onCreateTag: (name: String, emoji: String, color: Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var localSelectedIds by remember { mutableStateOf(selectedTagIds) }
+
+    if (showCreateDialog) {
+        CreateTagDialog(
+            onConfirm = { name, emoji, color ->
+                onCreateTag(name, emoji, color)
+                showCreateDialog = false
+            },
+            onDismiss = { showCreateDialog = false }
+        )
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Select Tags",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(tags) { tag ->
+                        MultiTagItem(
+                            tag = tag,
+                            isSelected = tag.id in localSelectedIds,
+                            onClick = {
+                                localSelectedIds = if (tag.id in localSelectedIds) {
+                                    localSelectedIds - tag.id
+                                } else {
+                                    localSelectedIds + tag.id
+                                }
+                            }
+                        )
+                    }
+
+                    if (tags.isEmpty()) {
+                        item {
+                            Text(
+                                text = "No tags yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showCreateDialog = true }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Create new tag",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = {
+                        localSelectedIds = emptySet()
+                    }) {
+                        Text("Clear All")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        onTagsSelected(localSelectedIds)
+                        onDismiss()
+                    }) {
+                        Text("Done")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiTagItem(
+    tag: Tag,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        Color(tag.color).copy(alpha = 0.2f),
+                        RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = tag.emoji,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = tag.name,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Color(tag.color), CircleShape)
+            )
+        }
+
+        if (isSelected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun SmallTagChip(
+    tag: Tag,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .background(
+                Color(tag.color).copy(alpha = 0.15f),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = tag.emoji,
+            fontSize = 12.sp
+        )
+        Text(
+            text = tag.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(tag.color)
+        )
+    }
+}

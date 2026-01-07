@@ -15,7 +15,7 @@ import com.money.tracker.service.TransactionNotificationHelper
 class MoneyTrackerApp : Application() {
 
     val database by lazy { AppDatabase.getDatabase(this) }
-    val transactionRepository by lazy { TransactionRepository(database.transactionDao()) }
+    val transactionRepository by lazy { TransactionRepository(database.transactionDao(), database.transactionTagDao()) }
     val categoryRepository by lazy { CategoryRepository(database.categoryDao()) }
     val budgetRepository by lazy { BudgetRepository(database.budgetDao()) }
     val upiReminderRepository by lazy { UpiReminderRepository(database.upiReminderDao()) }

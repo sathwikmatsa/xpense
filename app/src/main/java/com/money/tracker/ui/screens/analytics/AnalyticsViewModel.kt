@@ -276,8 +276,9 @@ class AnalyticsViewModel(
             transactionRepository.getCategoryTotals(TransactionType.EXPENSE, startTime, endTime),
             categoryRepository.allCategories,
             transactionRepository.getTransactionsByExpenseDateBetween(startTime, endTime),
-            tagRepository.allTags
-        ) { categoryTotals, categories, transactions, tags ->
+            tagRepository.allTags,
+            transactionRepository.getAllTransactionTagsMap()
+        ) { categoryTotals, categories, transactions, tags, transactionTagsMap ->
             // Build expanded excluded categories (include children of excluded parents)
             val expandedExcluded = if (excludedCategories.isEmpty()) {
                 emptySet()
@@ -292,7 +293,8 @@ class AnalyticsViewModel(
 
             // Filter by tag if selected, and exclude categories
             val filteredTransactions = transactions.filter { txn ->
-                (selectedTagId == null || txn.tagId == selectedTagId) &&
+                val txnTagIds = transactionTagsMap[txn.id] ?: emptyList()
+                (selectedTagId == null || txnTagIds.contains(selectedTagId)) &&
                 (expandedExcluded.isEmpty() || txn.categoryId !in expandedExcluded)
             }
 
@@ -397,13 +399,14 @@ class AnalyticsViewModel(
         }
 
         transactionRepository.getTransactionsByExpenseDateBetween(startTime, endTime).combine(
-            kotlinx.coroutines.flow.flowOf(Unit)
-        ) { transactions, _ ->
+            transactionRepository.getAllTransactionTagsMap()
+        ) { transactions, transactionTagsMap ->
             val filteredTransactions = transactions.filter { txn ->
+                val txnTagIds = transactionTagsMap[txn.id] ?: emptyList()
                 !txn.isPending &&
                 txn.type == TransactionType.EXPENSE &&
                 (expandedCategories.isEmpty() || txn.categoryId in expandedCategories) &&
-                (params.selectedTagId == null || txn.tagId == params.selectedTagId)
+                (params.selectedTagId == null || txnTagIds.contains(params.selectedTagId))
             }
 
             // Total is sum of all filtered transactions in the range

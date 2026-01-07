@@ -18,6 +18,7 @@ data class TransactionsUiState(
     val transactions: List<Transaction> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
     val tags: Map<Long, Tag> = emptyMap(),
+    val transactionTagIds: Map<Long, List<Long>> = emptyMap(),
     val isLoading: Boolean = true
 )
 
@@ -30,12 +31,14 @@ class TransactionsViewModel(
     val uiState: StateFlow<TransactionsUiState> = combine(
         transactionRepository.allTransactions,
         categoryRepository.allCategories,
-        tagRepository.allTags
-    ) { transactions, categories, tags ->
+        tagRepository.allTags,
+        transactionRepository.getAllTransactionTagsMap()
+    ) { transactions, categories, tags, transactionTagIds ->
         TransactionsUiState(
             transactions = transactions,
             categories = categories.associateBy { it.id },
             tags = tags.associateBy { it.id },
+            transactionTagIds = transactionTagIds,
             isLoading = false
         )
     }.stateIn(

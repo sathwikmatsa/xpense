@@ -164,7 +164,9 @@ fun TransactionsScreen(
         }
         val matchesTime = txn.date >= startTime && txn.date <= endTime
         val matchesCategory = expandedCategories.isEmpty() || txn.categoryId in expandedCategories
-        val matchesTag = selectedTags.isEmpty() || txn.tagId in selectedTags
+        // Check if any of the transaction's tags match the selected tags
+        val txnTagIds = uiState.transactionTagIds[txn.id] ?: emptyList()
+        val matchesTag = selectedTags.isEmpty() || txnTagIds.any { it in selectedTags }
         val matchesSplit = when (splitFilter) {
             SplitFilter.ALL -> true
             SplitFilter.SPLIT_ONLY -> txn.isSplit
@@ -402,12 +404,14 @@ fun TransactionsScreen(
                         }
                         items(transactions) { transaction ->
                             val category = uiState.categories[transaction.categoryId]
-                            val tag = transaction.tagId?.let { uiState.tags[it] }
+                            // Get all tags from junction table
+                            val tagIds = uiState.transactionTagIds[transaction.id] ?: emptyList()
+                            val tags = tagIds.mapNotNull { uiState.tags[it] }
                             if (category != null) {
                                 TransactionCard(
                                     transaction = transaction,
                                     category = category,
-                                    tag = tag,
+                                    tags = tags,
                                     onClick = { onTransactionClick(transaction.id) }
                                 )
                             }

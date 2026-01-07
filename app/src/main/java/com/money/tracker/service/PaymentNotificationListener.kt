@@ -77,7 +77,7 @@ class PaymentNotificationListener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         val db = AppDatabase.getDatabase(this)
-        transactionRepository = TransactionRepository(db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), db.transactionTagDao())
         Log.d(TAG, "Payment notification listener created")
     }
 

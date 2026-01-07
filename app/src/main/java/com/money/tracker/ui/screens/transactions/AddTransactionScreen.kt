@@ -80,8 +80,8 @@ import com.money.tracker.data.entity.SplitShare
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.CategoryPickerDialog
+import com.money.tracker.ui.components.MultiTagPickerDialog
 import com.money.tracker.ui.components.TagChip
-import com.money.tracker.ui.components.TagPickerDialog
 import com.money.tracker.ui.screens.settings.getSavedSharingApp
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -105,7 +105,7 @@ fun AddTransactionScreen(
     var description by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    var selectedTag by remember { mutableStateOf<Tag?>(null) }
+    var selectedTagIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var selectedSource by remember { mutableStateOf(initialSource) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var selectedExpenseDate by remember { mutableStateOf<Long?>(null) }
@@ -159,10 +159,10 @@ fun AddTransactionScreen(
     }
 
     if (showTagPicker) {
-        TagPickerDialog(
+        MultiTagPickerDialog(
             tags = tags,
-            selectedTag = selectedTag,
-            onTagSelected = { selectedTag = it },
+            selectedTagIds = selectedTagIds,
+            onTagsSelected = { selectedTagIds = it },
             onCreateTag = { name, emoji, color ->
                 viewModel.createTag(name, emoji, color)
             },
@@ -329,7 +329,7 @@ fun AddTransactionScreen(
                             source = selectedSource,
                             date = selectedDateTime,
                             expenseDate = selectedExpenseDate,
-                            tagId = selectedTag?.id
+                            tagIds = selectedTagIds.toList()
                         )
                         onSaved()
                     }
@@ -620,25 +620,24 @@ fun AddTransactionScreen(
 
             // Tag Picker (Optional)
             Text(
-                text = "Tag (Optional)",
+                text = "Tags (Optional)",
                 style = MaterialTheme.typography.labelLarge
             )
-            if (selectedTag != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+            val selectedTags = tags.filter { it.id in selectedTagIds }
+            if (selectedTags.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showTagPicker = true },
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TagChip(
-                        tag = selectedTag!!,
-                        onClear = { selectedTag = null }
-                    )
-                    Text(
-                        text = "Tap to change",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable { showTagPicker = true }
-                    )
+                    selectedTags.forEach { tag ->
+                        TagChip(
+                            tag = tag,
+                            onClear = { selectedTagIds = selectedTagIds - tag.id }
+                        )
+                    }
                 }
             } else {
                 Box(
@@ -652,7 +651,7 @@ fun AddTransactionScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Tap to add tag (e.g., Travel, Holiday)",
+                        text = "Tap to add tags (e.g., Travel, Holiday)",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -721,7 +720,7 @@ fun AddTransactionScreen(
                                 source = selectedSource,
                                 date = selectedDateTime,
                                 expenseDate = selectedExpenseDate,
-                                tagId = selectedTag?.id,
+                                tagIds = selectedTagIds.toList(),
                                 isSplit = true,
                                 splitNumerator = selectedSplitShare.numerator,
                                 splitDenominator = selectedSplitShare.denominator,
@@ -759,7 +758,7 @@ fun AddTransactionScreen(
                                 source = selectedSource,
                                 date = selectedDateTime,
                                 expenseDate = selectedExpenseDate,
-                                tagId = selectedTag?.id,
+                                tagIds = selectedTagIds.toList(),
                                 isSplit = true,
                                 splitNumerator = selectedSplitShare.numerator,
                                 splitDenominator = selectedSplitShare.denominator,

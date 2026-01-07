@@ -41,7 +41,7 @@ import java.util.Locale
 fun TransactionCard(
     transaction: Transaction,
     category: Category,
-    tag: Tag? = null,
+    tags: List<Tag> = emptyList(),
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -99,9 +99,9 @@ fun TransactionCard(
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    // Tag indicator
-                    if (tag != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
+                    // Tag indicators (show up to 3 dots)
+                    tags.take(3).forEach { tag ->
+                        Spacer(modifier = Modifier.width(4.dp))
                         Box(
                             modifier = Modifier
                                 .size(8.dp)

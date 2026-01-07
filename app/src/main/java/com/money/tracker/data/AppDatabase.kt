@@ -13,6 +13,7 @@ import com.money.tracker.data.dao.SharingAppDao
 import com.money.tracker.data.dao.TagBudgetDao
 import com.money.tracker.data.dao.TagDao
 import com.money.tracker.data.dao.TransactionDao
+import com.money.tracker.data.dao.TransactionTagDao
 import com.money.tracker.data.dao.UpiReminderDao
 import com.money.tracker.data.entity.Budget
 import com.money.tracker.data.entity.BudgetPreallocation
@@ -24,12 +25,13 @@ import com.money.tracker.data.entity.SharingApp
 import com.money.tracker.data.entity.Tag
 import com.money.tracker.data.entity.TagBudget
 import com.money.tracker.data.entity.Transaction
+import com.money.tracker.data.entity.TransactionTag
 import com.money.tracker.data.entity.UpiReminder
 import androidx.room.migration.Migration
 
 @Database(
-    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class, Tag::class, TagBudget::class],
-    version = 13,
+    entities = [Transaction::class, Category::class, Budget::class, UpiReminder::class, SharingApp::class, BudgetPreallocation::class, CategoryBudget::class, Tag::class, TagBudget::class, TransactionTag::class],
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -43,6 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryBudgetDao(): CategoryBudgetDao
     abstract fun tagDao(): TagDao
     abstract fun tagBudgetDao(): TagBudgetDao
+    abstract fun transactionTagDao(): TransactionTagDao
 
     companion object {
         @Volatile
@@ -212,6 +215,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 13 to 14: Add transaction_tags junction table for multi-tag support
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create transaction_tags junction table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS transaction_tags (
+                        transactionId INTEGER NOT NULL,
+                        tagId INTEGER NOT NULL,
+                        PRIMARY KEY(transactionId, tagId),
+                        FOREIGN KEY(transactionId) REFERENCES transactions(id) ON DELETE CASCADE,
+                        FOREIGN KEY(tagId) REFERENCES tags(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_tags_transactionId ON transaction_tags(transactionId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_tags_tagId ON transaction_tags(tagId)")
+
+                // Migrate existing tagId data to the junction table
+                db.execSQL("""
+                    INSERT INTO transaction_tags (transactionId, tagId)
+                    SELECT id, tagId FROM transactions WHERE tagId IS NOT NULL
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -219,7 +246,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "money_tracker_db"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

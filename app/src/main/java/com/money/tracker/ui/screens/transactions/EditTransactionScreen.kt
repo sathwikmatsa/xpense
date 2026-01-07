@@ -75,8 +75,8 @@ import com.money.tracker.data.entity.SplitShare
 import com.money.tracker.data.entity.TransactionSource
 import com.money.tracker.data.entity.TransactionType
 import com.money.tracker.ui.components.CategoryPickerDialog
+import com.money.tracker.ui.components.MultiTagPickerDialog
 import com.money.tracker.ui.components.TagChip
-import com.money.tracker.ui.components.TagPickerDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -92,12 +92,14 @@ fun EditTransactionScreen(
     val uiState by viewModel.uiState.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val tags by viewModel.tags.collectAsState()
+    val transactionTagIds by viewModel.tagIds.collectAsState()
 
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    var selectedTag by remember { mutableStateOf<Tag?>(null) }
+    var selectedTagIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var tagsInitialized by remember { mutableStateOf(false) }
     var selectedSource by remember { mutableStateOf(TransactionSource.UPI) }
     var selectedDateTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var selectedExpenseDate by remember { mutableStateOf<Long?>(null) }
@@ -162,10 +164,11 @@ fun EditTransactionScreen(
         }
     }
 
-    // Set tag when tags load (may load after transaction)
-    LaunchedEffect(uiState.transaction, tags) {
-        if (selectedTag == null && uiState.transaction?.tagId != null && tags.isNotEmpty()) {
-            selectedTag = tags.find { it.id == uiState.transaction!!.tagId }
+    // Set tags when transactionTagIds load
+    LaunchedEffect(transactionTagIds) {
+        if (!tagsInitialized && transactionTagIds.isNotEmpty()) {
+            selectedTagIds = transactionTagIds.toSet()
+            tagsInitialized = true
         }
     }
 
@@ -212,10 +215,10 @@ fun EditTransactionScreen(
     }
 
     if (showTagPicker) {
-        TagPickerDialog(
+        MultiTagPickerDialog(
             tags = tags,
-            selectedTag = selectedTag,
-            onTagSelected = { selectedTag = it },
+            selectedTagIds = selectedTagIds,
+            onTagsSelected = { selectedTagIds = it },
             onCreateTag = { name, emoji, color ->
                 viewModel.createTag(name, emoji, color)
             },
@@ -391,7 +394,7 @@ fun EditTransactionScreen(
                                 source = selectedSource,
                                 date = selectedDateTime,
                                 expenseDate = selectedExpenseDate,
-                                tagId = selectedTag?.id,
+                                tagIds = selectedTagIds.toList(),
                                 isSplit = isSplit,
                                 splitNumerator = selectedSplitShare.numerator,
                                 splitDenominator = selectedSplitShare.denominator,
@@ -705,25 +708,24 @@ fun EditTransactionScreen(
 
                 // Tag Picker (Optional)
                 Text(
-                    text = "Tag (Optional)",
+                    text = "Tags (Optional)",
                     style = MaterialTheme.typography.labelLarge
                 )
-                if (selectedTag != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
+                val selectedTags = tags.filter { it.id in selectedTagIds }
+                if (selectedTags.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showTagPicker = true },
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        TagChip(
-                            tag = selectedTag!!,
-                            onClear = { selectedTag = null }
-                        )
-                        Text(
-                            text = "Tap to change",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clickable { showTagPicker = true }
-                        )
+                        selectedTags.forEach { tag ->
+                            TagChip(
+                                tag = tag,
+                                onClear = { selectedTagIds = selectedTagIds - tag.id }
+                            )
+                        }
                     }
                 } else {
                     Box(
@@ -737,7 +739,7 @@ fun EditTransactionScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Tap to add tag (e.g., Travel, Holiday)",
+                            text = "Tap to add tags (e.g., Travel, Holiday)",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

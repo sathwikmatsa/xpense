@@ -45,8 +45,18 @@ class EditTransactionViewModel(
     val tags: StateFlow<List<Tag>> = tagRepository.allTags
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _tagIds = MutableStateFlow<List<Long>>(emptyList())
+    val tagIds: StateFlow<List<Long>> = _tagIds.asStateFlow()
+
     init {
         loadTransaction()
+        loadTagIds()
+    }
+
+    private fun loadTagIds() {
+        viewModelScope.launch {
+            _tagIds.value = transactionRepository.getTagIdsForTransaction(transactionId)
+        }
     }
 
     private fun loadTransaction() {
@@ -67,7 +77,7 @@ class EditTransactionViewModel(
         source: TransactionSource,
         date: Long,
         expenseDate: Long? = null,
-        tagId: Long? = null,
+        tagIds: List<Long> = emptyList(),
         isSplit: Boolean = false,
         splitNumerator: Int = 1,
         splitDenominator: Int = 1,
@@ -93,7 +103,7 @@ class EditTransactionViewModel(
                 description = description,
                 type = type,
                 categoryId = categoryId,
-                tagId = tagId,
+                tagId = tagIds.firstOrNull(), // Keep for backwards compatibility
                 source = source,
                 date = date,
                 expenseDate = expenseDate,
@@ -104,7 +114,7 @@ class EditTransactionViewModel(
                 totalAmount = if (isSplit) amount else 0.0,
                 splitSynced = if (isSplit && splitChanged) false else existing.splitSynced
             )
-            transactionRepository.update(updated)
+            transactionRepository.updateWithTags(updated, tagIds)
 
             // Cancel the notification if this was a pending transaction from SMS
             if (existing.isPending) {

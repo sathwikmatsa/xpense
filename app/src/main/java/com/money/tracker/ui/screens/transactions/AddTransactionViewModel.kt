@@ -86,7 +86,7 @@ class AddTransactionViewModel(
         source: TransactionSource,
         date: Long,
         expenseDate: Long? = null,
-        tagId: Long? = null,
+        tagIds: List<Long> = emptyList(),
         isSplit: Boolean = false,
         splitNumerator: Int = 1,
         splitDenominator: Int = 1,
@@ -106,7 +106,7 @@ class AddTransactionViewModel(
                 description = description,
                 type = type,
                 categoryId = categoryId,
-                tagId = tagId,
+                tagId = tagIds.firstOrNull(), // Keep for backwards compatibility
                 source = source,
                 date = date,
                 expenseDate = expenseDate,
@@ -117,7 +117,7 @@ class AddTransactionViewModel(
                 totalAmount = if (isSplit) amount else 0.0,
                 splitSynced = markAsSynced
             )
-            transactionRepository.insert(transaction)
+            transactionRepository.insertWithTags(transaction, tagIds)
         }
     }
 

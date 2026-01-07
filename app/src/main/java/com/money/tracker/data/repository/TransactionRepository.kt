@@ -2,11 +2,18 @@ package com.money.tracker.data.repository
 
 import com.money.tracker.data.dao.CategoryTotal
 import com.money.tracker.data.dao.TransactionDao
+import com.money.tracker.data.dao.TransactionTagDao
 import com.money.tracker.data.entity.Transaction
+import com.money.tracker.data.entity.TransactionTag
 import com.money.tracker.data.entity.TransactionType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
-class TransactionRepository(val transactionDao: TransactionDao) {
+class TransactionRepository(
+    val transactionDao: TransactionDao,
+    private val transactionTagDao: TransactionTagDao? = null
+) {
 
     val allTransactions: Flow<List<Transaction>> = transactionDao.getAllTransactions()
 
@@ -115,5 +122,45 @@ class TransactionRepository(val transactionDao: TransactionDao) {
     // Get preallocated expense (only preallocated categories)
     fun getPreallocatedExpense(startDate: Long, endDate: Long, preallocatedCategoryIds: List<Long>): Flow<Double?> {
         return transactionDao.getPreallocatedExpense(startDate, endDate, preallocatedCategoryIds)
+    }
+
+    // Multi-tag support methods
+    suspend fun insertWithTags(transaction: Transaction, tagIds: List<Long>): Long {
+        val transactionId = transactionDao.insert(transaction)
+        if (tagIds.isNotEmpty() && transactionTagDao != null) {
+            val transactionTags = tagIds.map { TransactionTag(transactionId, it) }
+            transactionTagDao.insertAll(transactionTags)
+        }
+        return transactionId
+    }
+
+    suspend fun updateWithTags(transaction: Transaction, tagIds: List<Long>) {
+        transactionDao.update(transaction)
+        transactionTagDao?.let { dao ->
+            dao.deleteAllForTransaction(transaction.id)
+            if (tagIds.isNotEmpty()) {
+                val transactionTags = tagIds.map { TransactionTag(transaction.id, it) }
+                dao.insertAll(transactionTags)
+            }
+        }
+    }
+
+    suspend fun getTagIdsForTransaction(transactionId: Long): List<Long> {
+        return transactionTagDao?.getTagIdsForTransaction(transactionId) ?: emptyList()
+    }
+
+    fun getTagIdsForTransactionFlow(transactionId: Long): Flow<List<Long>>? {
+        return transactionTagDao?.getTagIdsForTransactionFlow(transactionId)
+    }
+
+    // Get all transaction-tag mappings as a map of transactionId -> list of tagIds
+    fun getAllTransactionTagsMap(): Flow<Map<Long, List<Long>>> {
+        return transactionTagDao?.getAllTransactionTags()?.map { tags ->
+            tags.groupBy({ it.transactionId }, { it.tagId })
+        } ?: flowOf(emptyMap())
+    }
+
+    suspend fun getTransactionCountByTag(tagId: Long): Int {
+        return transactionTagDao?.getTransactionCountByTag(tagId) ?: transactionDao.getTransactionCountByTag(tagId)
     }
 }
