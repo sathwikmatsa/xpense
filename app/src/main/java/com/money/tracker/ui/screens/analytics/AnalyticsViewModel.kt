@@ -279,6 +279,12 @@ class AnalyticsViewModel(
             tagRepository.allTags,
             transactionRepository.getAllTransactionTagsMap()
         ) { categoryTotals, categories, transactions, tags, transactionTagsMap ->
+            // Build map of categories for quick lookup
+            val categoryMap = categories.associateBy { it.id }
+
+            // Get category IDs that should be excluded from expense totals (like Settlement, Transfer, Credit Card Bill)
+            val excludeFromExpenseCategoryIds = categories.filter { it.excludeFromExpense }.map { it.id }.toSet()
+
             // Build expanded excluded categories (include children of excluded parents)
             val expandedExcluded = if (excludedCategories.isEmpty()) {
                 emptySet()
@@ -299,7 +305,8 @@ class AnalyticsViewModel(
             }
 
             val expenseTransactions = filteredTransactions.filter {
-                !it.isPending && it.type == TransactionType.EXPENSE
+                !it.isPending && it.type == TransactionType.EXPENSE &&
+                (it.categoryId == null || it.categoryId !in excludeFromExpenseCategoryIds)
             }
             val totalExpense = expenseTransactions.sumOf { it.amount }
 
@@ -398,6 +405,9 @@ class AnalyticsViewModel(
             expanded
         }
 
+        // Get category IDs that should be excluded from expense totals (like Settlement, Transfer, Credit Card Bill)
+        val excludeFromExpenseCategoryIds = params.categories.filter { it.excludeFromExpense }.map { it.id }.toSet()
+
         transactionRepository.getTransactionsByExpenseDateBetween(startTime, endTime).combine(
             transactionRepository.getAllTransactionTagsMap()
         ) { transactions, transactionTagsMap ->
@@ -405,6 +415,7 @@ class AnalyticsViewModel(
                 val txnTagIds = transactionTagsMap[txn.id] ?: emptyList()
                 !txn.isPending &&
                 txn.type == TransactionType.EXPENSE &&
+                (txn.categoryId == null || txn.categoryId !in excludeFromExpenseCategoryIds) &&
                 (expandedCategories.isEmpty() || txn.categoryId in expandedCategories) &&
                 (params.selectedTagId == null || txnTagIds.contains(params.selectedTagId))
             }
