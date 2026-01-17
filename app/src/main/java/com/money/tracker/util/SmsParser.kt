@@ -10,7 +10,8 @@ data class ParsedTransaction(
     val description: String,
     val merchant: String?,
     val source: TransactionSource,
-    val rawMessage: String
+    val rawMessage: String,
+    val suggestedCategoryName: String? = null // Category name to auto-assign (e.g., "Credit Card Bill")
 )
 
 object SmsParser {
@@ -46,8 +47,17 @@ object SmsParser {
         "reminder", "otp is", "is otp", "otp for", "otp:", "one time password", "one-time password", "verification code", "do not share",
         "offer", "cashback offer", "reward", "win", "earn", "avail",
         "emi available", "convert to emi", "pre-approved", "limit increased",
-        "credited to your card", "credited to your credit card", // Credit card payment confirmations
         "upgrade now", "recharge now", "buy now", "book now", "apply now" // Promotional CTAs
+    )
+
+    // Patterns for credit card bill payment confirmations (should be treated as expenses)
+    private val creditCardPaymentKeywords = listOf(
+        "received towards your credit card",
+        "received towards your card",
+        "credited to your credit card",
+        "credited to your card",
+        "payment towards your credit card",
+        "payment received towards your credit card"
     )
 
     private val upiPatterns = listOf(
@@ -76,6 +86,9 @@ object SmsParser {
             return null // Not a transaction - it's a reminder/promo/OTP
         }
 
+        // Check if this is a credit card bill payment confirmation
+        val isCreditCardPayment = creditCardPaymentKeywords.any { lowerBody.contains(it) }
+
         // Check if this is a transaction SMS
         val isDebit = debitKeywords.any { lowerBody.contains(it) }
         val isCreditMsg = creditKeywords.any { lowerBody.contains(it) }
@@ -88,7 +101,8 @@ object SmsParser {
         val amount = extractAmount(smsBody) ?: return null
 
         // Determine transaction type
-        val type = if (isDebit) TransactionType.EXPENSE else TransactionType.INCOME
+        // Credit card payment confirmations are expenses (you paid the bill)
+        val type = if (isCreditCardPayment || isDebit) TransactionType.EXPENSE else TransactionType.INCOME
 
         // Determine source
         val source = determineSource(smsBody, sender)
@@ -99,13 +113,17 @@ object SmsParser {
         // Create description
         val description = createDescription(type, merchant, source)
 
+        // Suggest category for credit card bill payments
+        val suggestedCategory = if (isCreditCardPayment) "Credit Card Bill" else null
+
         return ParsedTransaction(
             amount = amount,
             type = type,
             description = description,
             merchant = merchant,
             source = source,
-            rawMessage = smsBody
+            rawMessage = smsBody,
+            suggestedCategoryName = suggestedCategory
         )
     }
 

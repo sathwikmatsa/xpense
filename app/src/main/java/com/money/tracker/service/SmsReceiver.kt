@@ -46,12 +46,19 @@ class SmsReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
+                // Look up category ID if a category name was suggested
+                val categoryId = if (parsed.suggestedCategoryName != null) {
+                    app.categoryRepository.getByName(parsed.suggestedCategoryName)?.id
+                } else {
+                    null
+                }
+
                 val transaction = Transaction(
                     amount = parsed.amount,
                     type = parsed.type,
                     description = parsed.description,
                     merchant = parsed.merchant,
-                    categoryId = null,
+                    categoryId = categoryId,
                     source = parsed.source,
                     date = System.currentTimeMillis(),
                     rawMessage = parsed.rawMessage,

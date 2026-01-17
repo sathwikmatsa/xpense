@@ -52,11 +52,14 @@ class PaymentNotificationListener : NotificationListenerService() {
             "you sent", "you paid", "debited", "debit", "paid to", "pay now",
             "offer", "cashback", "reward", "win", "scratch", "coupon", "discount",
             "earn", "unlock", "claim", "bonus", "expires", "limited time", "special",
-            "activate", "eligible", "congratulations", "you've won", "gift",
+            "activate", "activation", "eligible", "congratulations", "you've won", "gift",
             "loan", "pre-approved", "credit limit", "emi", "interest rate",
             "voucher", "bills pending", "top up", "we've got you", "get a",
             "bill from", "your bill", "use jewels", "save ₹", "save rs",
-            "instant cash", "quick credit", "low interest", "stressing you"
+            "instant cash", "quick credit", "low interest", "stressing you",
+            "auto-pay", "autopay", "upi auto-pay", // UPI mandate/autopay requests
+            "up to ₹", "up to rs", "upto ₹", "upto rs", // Promo amounts like "up to ₹7 lakhs"
+            "lakh", "lakhs", "lac", "lacs", "crore", "crores" // Large amount qualifiers in promos
         )
 
         // Pattern to extract sender name
