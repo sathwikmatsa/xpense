@@ -41,9 +41,10 @@ object SmsParser {
 
     // Keywords that indicate this is NOT a transaction (bill reminders, OTPs, promos, etc.)
     private val excludeKeywords = listOf(
-        "amt due", "amount due", "due date", "bill due", "pay now", "pay by",
-        "minimum due", "min due", "total due", "outstanding", "overdue",
+        "amt due", "amount due", "due date", "bill due", "pay now", "pay by", "due by", "is due by",
+        "minimum due", "min due", "total due", "outstanding", "overdue", "minimum of rs",
         "payment due", "will be processed", // Upcoming auto-debit reminders
+        "statement is sent", "statement sent", "statement generated", // Credit card statement notifications
         "reminder", "otp is", "is otp", "otp for", "otp:", "one time password", "one-time password", "verification code", "do not share",
         "offer", "cashback offer", "reward", "win", "earn", "avail",
         "emi available", "convert to emi", "pre-approved", "limit increased",
