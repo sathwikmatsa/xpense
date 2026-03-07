@@ -765,9 +765,10 @@ fun AddTransactionScreen(
                                 customMyShare = myShareValue,
                                 markAsSynced = true
                             )
-                            // Copy amount to clipboard
+                            // Copy description and amount to clipboard
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("amount", amountValue.toLong().toString()))
+                            val clipDateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+                            clipboard.setPrimaryClip(ClipData.newPlainText("transaction", "${description} - ${currencyFormat.format(amountValue)} - ${clipDateFormat.format(Date(selectedDateTime))}"))
                             // Open selected sharing app
                             val savedApp = getSavedSharingApp(context)
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {

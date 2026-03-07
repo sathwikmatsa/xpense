@@ -1321,9 +1321,9 @@ private fun UnsyncedSplitCard(
                 }
                 Button(
                     onClick = {
-                        // Copy amount to clipboard
+                        // Copy description and amount to clipboard
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Split Amount", transaction.totalAmount.toLong().toString())
+                        val clip = ClipData.newPlainText("transaction", "${transaction.description} - ${currencyFormat.format(transaction.totalAmount)} - ${dateFormat.format(transaction.date)}")
                         clipboard.setPrimaryClip(clip)
                         // Open sharing app
                         val savedApp = getSavedSharingApp(context)
